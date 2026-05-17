@@ -107,19 +107,29 @@ function updateAnalyzeButtonState() {
 
 
 function setOverlay(overlayKey) {
-    if (!latestImages || !latestImages[overlayKey]) return;
+    if (!latestImages) return;
 
     currentOverlayKey = overlayKey;
 
- overlayImage.onload = () => {
-    syncCorrectionCanvas();
+    const clickableSource = getCurrentSpotSource();
 
-    requestAnimationFrame(() => {
-        drawIgnoredSpotMarkers();
-    });
-};
+    let imageKey = overlayKey;
 
-    overlayImage.src = `data:image/png;base64,${latestImages[overlayKey]}`;
+    if (clickableSource) {
+        imageKey = clickableSource.side === "back" ? "back_card" : "card";
+    }
+
+    if (!latestImages[imageKey]) return;
+
+    overlayImage.onload = () => {
+        syncCorrectionCanvas();
+
+        requestAnimationFrame(() => {
+            drawCorrectionOverlay();
+        });
+    };
+
+    overlayImage.src = `data:image/png;base64,${latestImages[imageKey]}`;
 
     if (overlayTitle) {
         overlayTitle.textContent = overlayLabels[overlayKey] || "Overlay";
@@ -128,9 +138,9 @@ function setOverlay(overlayKey) {
     overlayButtons.forEach(button => {
         button.classList.toggle("active", button.dataset.overlay === overlayKey);
     });
+
     updateFindingSummary();
 }
-
 
 
 function getFileFromInput(event) {
@@ -312,7 +322,7 @@ function ignoreSpot(spotId) {
         ignoredHistory.push(spotId);
     }
 
-    drawIgnoredSpotMarkers();
+    drawCorrectionOverlay();
     recalculateDisplayedGrade();
 
     const detailsPanel = document.getElementById("finding-details");
@@ -347,7 +357,7 @@ function undoLastIgnoredSpot() {
 
     ignoredSpots = ignoredSpots.filter(id => id !== lastIgnored);
 
-    drawIgnoredSpotMarkers();
+    drawCorrectionOverlay();
     recalculateDisplayedGrade();
 
     const detailsPanel = document.getElementById("finding-details");
@@ -512,11 +522,11 @@ function syncCorrectionCanvas() {
     correctionCanvas.style.width = `${rect.width}px`;
     correctionCanvas.style.height = `${rect.height}px`;
 
-    drawIgnoredSpotMarkers();
+   drawCorrectionOverlay();
 }
 
 
-function drawIgnoredSpotMarkers() {
+function drawCorrectionOverlay() {
     if (!correctionCtx || !correctionCanvas || !overlayImage) return;
 
     correctionCtx.clearRect(0, 0, correctionCanvas.width, correctionCanvas.height);
@@ -532,7 +542,7 @@ function drawIgnoredSpotMarkers() {
     source.spots.forEach((spot, index) => {
         const id = getSpotId(source, spot, index);
 
-        if (!isIgnored(id)) return;
+        if (isIgnored(id)) return;
 
         const box = getSpotBox(spot);
 
@@ -541,12 +551,14 @@ function drawIgnoredSpotMarkers() {
         const w = box.width * scaleX;
         const h = box.height * scaleY;
 
-        // Paint over ignored finding with surrounding overlay color
-       const sampleX = Math.max(0, Math.floor(x));
-const sampleY = Math.max(0, Math.floor(y));
+        const color = getFindingColor(spot.severity);
 
-correctionCtx.fillStyle = "rgba(244,246,248,0.98)";
-        correctionCtx.fillRect(x - 2, y - 2, w + 4, h + 4);
+        correctionCtx.fillStyle = color.fill;
+        correctionCtx.strokeStyle = color.stroke;
+        correctionCtx.lineWidth = 2;
+
+        correctionCtx.fillRect(x, y, w, h);
+        correctionCtx.strokeRect(x, y, w, h);
     });
 }
 function recalculateDisplayedGrade() {
@@ -587,7 +599,7 @@ function resetCorrections() {
     ignoredSpots = [];
     ignoredHistory = [];
 
-    drawIgnoredSpotMarkers();
+   drawCorrectionOverlay();
 
     if (latestData) {
         updateFinalGradeUI(latestData);
@@ -632,4 +644,25 @@ function updateFindingSummary() {
         <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
         <p class="hint">Click a box to inspect it. Shift-click to ignore it.</p>
     `;
+}
+
+function getFindingColor(severity) {
+    if (severity === "heavy") {
+        return {
+            fill: "rgba(239, 68, 68, 0.22)",
+            stroke: "#ef4444"
+        };
+    }
+
+    if (severity === "moderate") {
+        return {
+            fill: "rgba(249, 115, 22, 0.22)",
+            stroke: "#f97316"
+        };
+    }
+
+    return {
+        fill: "rgba(234, 179, 8, 0.22)",
+        stroke: "#eab308"
+    };
 }
