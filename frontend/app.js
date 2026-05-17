@@ -268,12 +268,12 @@ function findClickedSpot(x, y, source) {
 
 
 function estimateSpotImpact(source, spot) {
-    const severityImpact = {
-        minor: 0.05,
-        moderate: 0.15,
-        heavy: 0.35,
-        clean: 0
-    };
+    if (typeof spot.grade_penalty === "number") {
+        return spot.grade_penalty;
+    }
+
+    return 0;
+}
 
     const typeMultiplier = {
         edges: 1.0,
@@ -293,7 +293,7 @@ function estimateSpotImpact(source, spot) {
         areaImpact;
 
     return Math.round(impact * 100) / 100;
-}
+
 
 
 function showSpotDetails(source, clicked) {
@@ -326,6 +326,7 @@ function ignoreSpot(spotId) {
     recalculateDisplayedGrade();
     updateFindingSummary();
     updateCorrectedScoreCards();
+    showCorrectionSummary();
 
     setStatus("Finding ignored and grade estimate adjusted.");
 }
@@ -549,13 +550,12 @@ function recalculateDisplayedGrade() {
 
     let restoredPoints = 0;
 
-    Object.keys(overlayLabels).forEach(() => {});
-
     const sources = [
         { side: "front", type: "edges", spots: latestData.edges?.spots || [] },
         { side: "front", type: "corners", spots: latestData.corners?.spots || [] },
         { side: "front", type: "whitening", spots: latestData.whitening?.spots || [] },
         { side: "front", type: "surface", spots: latestData.surface?.spots || [] },
+
         { side: "back", type: "edges", spots: latestData.back?.edges?.spots || [] },
         { side: "back", type: "corners", spots: latestData.back?.corners?.spots || [] },
         { side: "back", type: "whitening", spots: latestData.back?.whitening?.spots || [] },
@@ -572,12 +572,23 @@ function recalculateDisplayedGrade() {
         });
     });
 
+    const adjustedGrade =
+        Math.min(
+            10,
+            Math.round((baseGrade + restoredPoints) * 10) / 10
+        );
+
+    document.getElementById("final-grade").textContent = adjustedGrade;
+
+    document.getElementById("grade-summary").textContent =
+        `Adjusted after ignoring ${ignoredSpots.length} finding(s).`;
+}
     const adjustedGrade = Math.min(10, Math.round((baseGrade + restoredPoints) * 10) / 10);
 
     document.getElementById("final-grade").textContent = adjustedGrade;
     document.getElementById("grade-summary").textContent =
         `Adjusted after ignoring ${ignoredSpots.length} false-positive finding(s).`;
-}
+
 function resetCorrections() {
     ignoredSpots = [];
     ignoredHistory = [];
@@ -650,37 +661,67 @@ function getFindingColor(severity) {
         stroke: "#eab308"
     };
 }
-function updateCorrectedScoreCards() {
-    if (!latestData) return;
+function adjustedDetectorScore(originalScore, originalSpots, sourceInfo) {
+    if (!originalSpots || originalSpots.length === 0) {
+        return originalScore;
+    }
 
-    const sources = [
-        {
-            type: "surface",
-            elementId: "surface-defects",
-            spots: latestData.surface?.spots || []
-        },
-        {
-            type: "whitening",
-            elementId: "whitening-spots",
-            spots: latestData.whitening?.spots || []
-        }
-    ];
+    let restoredPenalty = 0;
 
-    sources.forEach(source => {
-        const activeCount = source.spots.filter((spot, index) => {
-            const id = getSpotId(
-                { side: "front", type: source.type },
-                spot,
-                index
-            );
+    originalSpots.forEach((spot, index) => {
+        const id = getSpotId(sourceInfo, spot, index);
 
-            return !isIgnored(id);
-        }).length;
-
-        const element = document.getElementById(source.elementId);
-
-        if (element) {
-            element.textContent = activeCount;
+        if (isIgnored(id)) {
+            restoredPenalty += estimateSpotImpact(sourceInfo, spot);
         }
     });
+
+    const adjustedScore = originalScore + restoredPenalty;
+
+    return Math.min(10, Math.round(adjustedScore * 10) / 10);
+}
+function adjustedDetectorScore(originalScore, originalSpots, sourceInfo) {
+    if (!originalSpots || originalSpots.length === 0) {
+        return originalScore;
+    }
+
+    const ignoredCount = originalSpots.filter((spot, index) => {
+        const id = getSpotId(sourceInfo, spot, index);
+        return isIgnored(id);
+    }).length;
+
+    const restored = ignoredCount * 0.2;
+    return Math.min(10, Math.round((originalScore + restored) * 10) / 10);
+}
+
+function countActiveSpots(spots, sourceInfo) {
+    return spots.filter((spot, index) => {
+        const id = getSpotId(sourceInfo, spot, index);
+        return !isIgnored(id);
+    }).length;
+}
+
+function showCorrectionSummary() {
+    const detailsPanel = document.getElementById("finding-details");
+    if (!detailsPanel) return;
+
+    detailsPanel.innerHTML = `
+        <h4>Correction Applied</h4>
+        <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
+        <p>The visible grade and subgrades have been adjusted.</p>
+        <button id="undo-ignore-button" class="secondary-button">
+            Undo Last Ignore
+        </button>
+        <button id="reset-corrections-button" class="secondary-button">
+            Reset Corrections
+        </button>
+    `;
+
+    document
+        .getElementById("undo-ignore-button")
+        .addEventListener("click", undoLastIgnoredSpot);
+
+    document
+        .getElementById("reset-corrections-button")
+        .addEventListener("click", resetCorrections);
 }

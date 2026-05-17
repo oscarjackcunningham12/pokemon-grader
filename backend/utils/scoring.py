@@ -25,27 +25,44 @@ def centering_penalty(horizontal_ratio: str, vertical_ratio: str) -> float:
     v_off = abs(v1 - v2)
 
     penalty = 0
+    penalty += max(0, h_off - 5) * 0.055
+    penalty += max(0, v_off - 5) * 0.055
 
-    penalty += max(0, h_off - 5) * 0.045
-    penalty += max(0, v_off - 5) * 0.045
-
-    return min(penalty, 1.25)
+    return min(penalty, 1.5)
 
 
 def detector_penalty(score: float, weight: float) -> float:
-    """
-    Converts a detector score into a grade penalty.
-
-    Example:
-    detector score 9.0 with weight 0.6 = small penalty
-    detector score 5.0 with weight 0.6 = larger penalty
-
-    This is intentionally softer so one small defect does not crush the grade.
-    """
     score = max(1.0, min(10.0, float(score)))
     quality_loss = 10.0 - score
 
     return quality_loss * weight
+
+
+def finding_grade_penalty(finding_type: str, severity: str, area: int) -> float:
+    """
+    Per-finding penalty used by the frontend correction system.
+
+    If the user ignores a false positive, this exact value should be reversed.
+    """
+    base_by_severity = {
+        "minor": 0.06,
+        "moderate": 0.16,
+        "heavy": 0.35,
+        "clean": 0.0,
+    }
+
+    type_multiplier = {
+        "edges": 1.0,
+        "corners": 1.15,
+        "whitening": 0.9,
+        "surface": 0.75,
+    }
+
+    base = base_by_severity.get(severity, 0.08)
+    multiplier = type_multiplier.get(finding_type, 1.0)
+    area_penalty = min(max(area, 0) / 1200, 0.28)
+
+    return round((base * multiplier) + area_penalty, 2)
 
 
 def calculate_final_grade(
@@ -63,10 +80,10 @@ def calculate_final_grade(
         centering_vertical_ratio,
     )
 
-    grade -= detector_penalty(edges_score, 0.18)
-    grade -= detector_penalty(corners_score, 0.22)
-    grade -= detector_penalty(whitening_score, 0.18)
-    grade -= detector_penalty(surface_score, 0.14)
+    grade -= detector_penalty(edges_score, 0.22)
+    grade -= detector_penalty(corners_score, 0.26)
+    grade -= detector_penalty(whitening_score, 0.22)
+    grade -= detector_penalty(surface_score, 0.18)
 
     grade = round(max(1.0, min(10.0, grade)), 1)
 

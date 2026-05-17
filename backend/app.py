@@ -13,7 +13,11 @@ from detectors.corners import analyze_corners, corner_result_to_dict
 from detectors.whitening import analyze_whitening, whitening_result_to_dict
 from detectors.surface import analyze_surface, surface_result_to_dict
 from utils.image_utils import pil_to_bgr, bgr_to_rgb
-from utils.scoring import calculate_final_grade, final_grade_to_dict
+from utils.scoring import (
+    calculate_final_grade,
+    final_grade_to_dict,
+    finding_grade_penalty,
+)
 from utils.regions import build_regions_from_centering_lines, regions_to_dict
 from utils.regions_overlay import draw_regions_overlay
 
@@ -51,10 +55,59 @@ def load_image_from_request(file_key: str) -> np.ndarray:
     return pil_to_bgr(pil_image)
 
 
+def ratio_off_center_amount(ratio: str) -> int:
+    try:
+        a, b = ratio.split("/")
+        return abs(int(a) - int(b))
+    except Exception:
+        return 999
+
+
+def worse_centering_ratio(front_ratio: str, back_ratio: str) -> str:
+    front_off = ratio_off_center_amount(front_ratio)
+    back_off = ratio_off_center_amount(back_ratio)
+
+    return back_ratio if back_off > front_off else front_ratio
+
+
+def add_penalties_to_spots(result_dict: dict, finding_type: str) -> dict:
+    spots = result_dict.get("spots", [])
+
+    for spot in spots:
+        spot["grade_penalty"] = finding_grade_penalty(
+            finding_type=finding_type,
+            severity=spot.get("severity", "minor"),
+            area=int(spot.get("area", 0)),
+        )
+
+    return result_dict
+
+
+def detector_to_dicts(result: dict) -> dict:
+    return {
+        "edges": add_penalties_to_spots(
+            edge_result_to_dict(result["edges"]),
+            "edges",
+        ),
+        "corners": add_penalties_to_spots(
+            corner_result_to_dict(result["corners"]),
+            "corners",
+        ),
+        "whitening": add_penalties_to_spots(
+            whitening_result_to_dict(result["whitening"]),
+            "whitening",
+        ),
+        "surface": add_penalties_to_spots(
+            surface_result_to_dict(result["surface"]),
+            "surface",
+        ),
+    }
+
+
 def analyze_one_side(image_bgr: np.ndarray, manual_lines=None) -> dict:
     centering = analyze_centering(
         image_bgr,
-        manual_lines=manual_lines
+        manual_lines=manual_lines,
     )
 
     card = centering.card_image
@@ -89,27 +142,7 @@ def analyze_one_side(image_bgr: np.ndarray, manual_lines=None) -> dict:
         "whitening": whitening,
         "surface": surface,
     }
-def ratio_off_center_amount(ratio: str) -> int:
-    try:
-        a, b = ratio.split("/")
-        return abs(int(a) - int(b))
-    except Exception:
-        return 999
 
-
-def worse_centering_ratio(front_ratio: str, back_ratio: str) -> str:
-    """
-    Uses the worse of the front/back centering ratios.
-    Example:
-    front = 48/52
-    back = 42/58
-
-    Result = 42/58
-    """
-    front_off = ratio_off_center_amount(front_ratio)
-    back_off = ratio_off_center_amount(back_ratio)
-
-    return back_ratio if back_off > front_off else front_ratio
 
 def combine_side_scores(front_result: dict, back_result: dict):
     front_centering = front_result["centering"]
@@ -149,8 +182,6 @@ def combine_side_scores(front_result: dict, back_result: dict):
         1,
     )
 
-    # For now, surface is mostly front-weighted.
-    # Back logo/text creates false positives, so we do not heavily use back surface.
     combined_surface_score = round(front_surface.score, 1)
 
     return calculate_final_grade(
@@ -174,7 +205,6 @@ def analyze_full_route():
         front_manual_lines = get_json_field("front_manual_lines")
         back_manual_lines = get_json_field("back_manual_lines")
 
-        # Backwards compatibility with older frontend
         old_manual_lines = get_json_field("manual_lines")
         if old_manual_lines and not front_manual_lines:
             front_manual_lines = old_manual_lines
@@ -185,6 +215,9 @@ def analyze_full_route():
 
             front = analyze_one_side(front_bgr, manual_lines=front_manual_lines)
             back = analyze_one_side(back_bgr, manual_lines=back_manual_lines)
+
+            front_dicts = detector_to_dicts(front)
+            back_dicts = detector_to_dicts(back)
 
             final_grade = combine_side_scores(front, back)
 
@@ -217,15 +250,15 @@ def analyze_full_route():
                     "front": regions_to_dict(front["regions"]) if front["regions"] else None,
                     "back": regions_to_dict(back["regions"]) if back["regions"] else None,
                 },
-                "edges": edge_result_to_dict(front["edges"]),
-                "corners": corner_result_to_dict(front["corners"]),
-                "whitening": whitening_result_to_dict(front["whitening"]),
-                "surface": surface_result_to_dict(front["surface"]),
+                "edges": front_dicts["edges"],
+                "corners": front_dicts["corners"],
+                "whitening": front_dicts["whitening"],
+                "surface": front_dicts["surface"],
                 "back": {
-                    "edges": edge_result_to_dict(back["edges"]),
-                    "corners": corner_result_to_dict(back["corners"]),
-                    "whitening": whitening_result_to_dict(back["whitening"]),
-                    "surface": surface_result_to_dict(back["surface"]),
+                    "edges": back_dicts["edges"],
+                    "corners": back_dicts["corners"],
+                    "whitening": back_dicts["whitening"],
+                    "surface": back_dicts["surface"],
                 },
                 "images": {
                     "card": image_to_base64(front["card"]),
@@ -251,6 +284,7 @@ def analyze_full_route():
         if "image" in request.files:
             image_bgr = load_image_from_request("image")
             result = analyze_one_side(image_bgr, manual_lines=front_manual_lines)
+            result_dicts = detector_to_dicts(result)
 
             final_grade = calculate_final_grade(
                 centering_horizontal_ratio=result["centering"].horizontal_ratio,
@@ -276,10 +310,10 @@ def analyze_full_route():
                     "confidence_note": result["centering"].confidence_note,
                 },
                 "regions": regions_to_dict(result["regions"]) if result["regions"] else None,
-                "edges": edge_result_to_dict(result["edges"]),
-                "corners": corner_result_to_dict(result["corners"]),
-                "whitening": whitening_result_to_dict(result["whitening"]),
-                "surface": surface_result_to_dict(result["surface"]),
+                "edges": result_dicts["edges"],
+                "corners": result_dicts["corners"],
+                "whitening": result_dicts["whitening"],
+                "surface": result_dicts["surface"],
                 "images": {
                     "card": image_to_base64(result["card"]),
                     "centering_overlay": image_to_base64(result["centering"].overlay_image),
@@ -310,7 +344,7 @@ def analyze_centering_route():
 
         centering = analyze_centering(
             image_bgr,
-            manual_lines=manual_lines
+            manual_lines=manual_lines,
         )
 
         return jsonify({
@@ -332,4 +366,4 @@ def analyze_centering_route():
 
 
 if __name__ == "__main__":
-    app.run(debug=True) 
+    app.run(debug=True)
