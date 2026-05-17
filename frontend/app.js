@@ -274,28 +274,6 @@ function estimateSpotImpact(source, spot) {
 
     return 0;
 }
-
-    const typeMultiplier = {
-        edges: 1.0,
-        corners: 1.15,
-        whitening: 0.9,
-        surface: 0.75
-    };
-
-    const area = spot.area || 0;
-    const areaImpact = Math.min(area / 500, 0.35);
-
-    const severity = spot.severity || "minor";
-
-    const impact =
-        (severityImpact[severity] || 0.08) *
-        (typeMultiplier[source.type] || 1) +
-        areaImpact;
-
-    return Math.round(impact * 100) / 100;
-
-
-
 function showSpotDetails(source, clicked) {
     const detailsPanel = document.getElementById("finding-details");
 
@@ -583,12 +561,6 @@ function recalculateDisplayedGrade() {
     document.getElementById("grade-summary").textContent =
         `Adjusted after ignoring ${ignoredSpots.length} finding(s).`;
 }
-    const adjustedGrade = Math.min(10, Math.round((baseGrade + restoredPoints) * 10) / 10);
-
-    document.getElementById("final-grade").textContent = adjustedGrade;
-    document.getElementById("grade-summary").textContent =
-        `Adjusted after ignoring ${ignoredSpots.length} false-positive finding(s).`;
-
 function resetCorrections() {
     ignoredSpots = [];
     ignoredHistory = [];
@@ -679,19 +651,6 @@ function adjustedDetectorScore(originalScore, originalSpots, sourceInfo) {
     const adjustedScore = originalScore + restoredPenalty;
 
     return Math.min(10, Math.round(adjustedScore * 10) / 10);
-}
-function adjustedDetectorScore(originalScore, originalSpots, sourceInfo) {
-    if (!originalSpots || originalSpots.length === 0) {
-        return originalScore;
-    }
-
-    const ignoredCount = originalSpots.filter((spot, index) => {
-        const id = getSpotId(sourceInfo, spot, index);
-        return isIgnored(id);
-    }).length;
-
-    const restored = ignoredCount * 0.2;
-    return Math.min(10, Math.round((originalScore + restored) * 10) / 10);
 }
 
 function countActiveSpots(spots, sourceInfo) {
