@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "frontend": "npx serve frontend",
+    "backend": "python3 backend/app.py",
+    "test": "python3 -m pytest"
+  },
+  "devDependencies": {
+    "serve": "^14.2.4"
+  }
+}

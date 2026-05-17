@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pokemon Card Grader</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <h1>Pokemon Card Grader</h1>
+    <p class="subtitle">Manual centering, front/back grading, condition scoring, and visual overlays</p>
+
+    <!-- Upload -->
+    <div class="upload-section">
+        <h3>Upload Card Images</h3>
+
+        <div class="upload-grid">
+            <div class="upload-card">
+                <label for="front-upload">Front Image</label>
+                <input type="file" id="front-upload" accept="image/*">
+            </div>
+
+            <div class="upload-card">
+                <label for="back-upload">Back Image</label>
+                <input type="file" id="back-upload" accept="image/*">
+            </div>
+        </div>
+
+        <div id="status"></div>
+
+        <button id="analyze-button" disabled>Analyze Card</button>
+    </div>
+
+    <!-- Manual Centering -->
+    <div class="manual-centering-section">
+    <h3>Manual Centering Selection</h3>
+    <p>Adjust the guide lines for both the front and back before analyzing.</p>
+
+    <div class="centering-canvas-grid">
+        <div class="centering-canvas-card">
+            <h4>Front Centering</h4>
+            <canvas id="front-centering-canvas"></canvas>
+        </div>
+
+        <div class="centering-canvas-card">
+            <h4>Back Centering</h4>
+            <canvas id="back-centering-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+    <!-- Final Grade -->
+    <div class="final-grade-card">
+        <h2>Estimated Final Grade</h2>
+        <div id="final-grade">-</div>
+        <p id="grade-label">-</p>
+        <p id="grade-summary">Upload front and back images to generate an estimate.</p>
+    </div>
+
+    <!-- Score Cards -->
+    <div class="score-grid">
+        <div class="score-card">
+            <h3>Centering</h3>
+            <p>Horizontal: <span id="horizontal-ratio">-</span></p>
+            <p>Vertical: <span id="vertical-ratio">-</span></p>
+        </div>
+
+        <div class="score-card">
+            <h3>Edges</h3>
+            <p>Score: <span id="edges-score">-</span></p>
+            <p>Severity: <span id="edges-severity">-</span></p>
+        </div>
+
+        <div class="score-card">
+            <h3>Corners</h3>
+            <p>Score: <span id="corners-score">-</span></p>
+            <p>Severity: <span id="corners-severity">-</span></p>
+        </div>
+
+        <div class="score-card">
+            <h3>Whitening</h3>
+            <p>Score: <span id="whitening-score">-</span></p>
+            <p>Spots: <span id="whitening-spots">-</span></p>
+        </div>
+
+        <div class="score-card">
+            <h3>Surface</h3>
+            <p>Score: <span id="surface-score">-</span></p>
+            <p>Issues: <span id="surface-defects">-</span></p>
+        </div>
+    </div>
+
+    <!-- Centering Measurements -->
+    <div class="measurements">
+        <h3>Centering Measurements</h3>
+        <p>Left: <span id="left">-</span></p>
+        <p>Right: <span id="right">-</span></p>
+        <p>Top: <span id="top">-</span></p>
+        <p>Bottom: <span id="bottom">-</span></p>
+    </div>
+
+   <!-- Overlay Switcher -->
+<div class="overlay-switcher">
+    <h3>Overlay View</h3>
+
+    <div class="overlay-buttons">
+        <button data-overlay="centering_overlay">Front Centering</button>
+        <button data-overlay="regions_overlay">Front Regions</button>
+        <button data-overlay="edges_overlay">Front Edges</button>
+        <button data-overlay="corners_overlay">Front Corners</button>
+        <button data-overlay="whitening_overlay">Front Whitening</button>
+        <button data-overlay="surface_overlay">Front Surface</button>
+        <button data-overlay="back_centering_overlay">Back Centering</button>
+        <button data-overlay="back_regions_overlay">Back Regions</button>
+        <button data-overlay="back_card">Back Card</button>
+        <button data-overlay="back_edges_overlay">Back Edges</button>
+        <button data-overlay="back_corners_overlay">Back Corners</button>
+        <button data-overlay="back_whitening_overlay">Back Whitening</button>
+        <button data-overlay="back_surface_overlay">Back Surface</button>
+    </div>
+</div>
+    <!-- Images -->
+    <div class="images">
+        <div>
+            <h3>Processed Card</h3>
+            <img id="preview-image" />
+        </div>
+
+        <div>
+            <h3 id="overlay-title">Centering Overlay</h3>
+            <img id="overlay-image" />
+        </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+
+</body>
+</html>
