@@ -285,3 +285,63 @@ h3 {
     top: 0;
     pointer-events: none;
 }
+.finding-details {
+    margin-top: 16px;
+    background: #ffffff;
+    border: 1px solid #d0d5dd;
+    border-radius: 16px;
+    padding: 16px;
+    text-align: left;
+    max-width: 420px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.finding-details h4 {
+    margin: 0 0 12px;
+    color: #111827;
+    font-size: 18px;
+}
+
+.finding-details p {
+    margin: 8px 0;
+    color: #344054;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.finding-details .hint {
+    margin-top: 14px;
+    color: #2563eb;
+    font-weight: 600;
+}
+
+.overlay-frame {
+    position: relative;
+    display: inline-block;
+    line-height: 0;
+}
+
+#overlay-image {
+    display: block;
+}
+
+#correction-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+}
+.secondary-button {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: #ffffff;
+    color: #2563eb;
+    border: 1px solid #2563eb;
+    border-radius: 999px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.secondary-button:hover {
+    background: #eff6ff;
+}

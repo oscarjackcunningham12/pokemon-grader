@@ -41,6 +41,7 @@ const overlayTitle = document.getElementById("overlay-title");
 const overlayButtons = document.querySelectorAll("[data-overlay]");
 const correctionCanvas = document.getElementById("correction-canvas");
 const correctionCtx = correctionCanvas ? correctionCanvas.getContext("2d") : null;
+const resetCorrectionsButton = document.getElementById("reset-corrections-button");
 
 let baseGrade = null;
 
@@ -52,6 +53,7 @@ let backFile = null;
 
 let currentOverlayKey = "centering_overlay";
 let ignoredSpots = [];
+let ignoredHistory = [];
 
 
 const overlayLabels = {
@@ -109,9 +111,13 @@ function setOverlay(overlayKey) {
 
     currentOverlayKey = overlayKey;
 
-    overlayImage.onload = () => {
-        syncCorrectionCanvas();
-    };
+ overlayImage.onload = () => {
+    syncCorrectionCanvas();
+
+    requestAnimationFrame(() => {
+        drawIgnoredSpotMarkers();
+    });
+};
 
     overlayImage.src = `data:image/png;base64,${latestImages[overlayKey]}`;
 
@@ -122,6 +128,7 @@ function setOverlay(overlayKey) {
     overlayButtons.forEach(button => {
         button.classList.toggle("active", button.dataset.overlay === overlayKey);
     });
+    updateFindingSummary();
 }
 
 
@@ -280,33 +287,81 @@ function estimateSpotImpact(source, spot) {
 
 
 function showSpotDetails(source, clicked) {
+    const detailsPanel = document.getElementById("finding-details");
+
+    if (!detailsPanel) return;
+
     const spot = clicked.spot;
     const impact = estimateSpotImpact(source, spot);
 
-    const message = [
-        `${source.side.toUpperCase()} ${source.type.toUpperCase()} finding`,
-        `Severity: ${spot.severity || "unknown"}`,
-        `Area: ${spot.area || "unknown"} px`,
-        `Estimated grade impact: -${impact}`,
-        "",
-        "Shift-click this box to ignore it as a false positive."
-    ].join("\n");
-
-    alert(message);
+    detailsPanel.innerHTML = `
+        <h4>Finding Details</h4>
+        <p><strong>Side:</strong> ${source.side}</p>
+        <p><strong>Type:</strong> ${source.type}</p>
+        <p><strong>Severity:</strong> ${spot.severity || "unknown"}</p>
+        <p><strong>Area:</strong> ${spot.area || "unknown"} px</p>
+        <p><strong>Estimated Grade Impact:</strong> -${impact}</p>
+        <p class="hint">Shift-click this finding to ignore it.</p>
+    `;
 }
 
 
 function ignoreSpot(spotId) {
     if (!ignoredSpots.includes(spotId)) {
         ignoredSpots.push(spotId);
+        ignoredHistory.push(spotId);
     }
 
     drawIgnoredSpotMarkers();
     recalculateDisplayedGrade();
 
-    setStatus("Finding ignored visually and grade estimate adjusted.");
+    const detailsPanel = document.getElementById("finding-details");
+
+    if (detailsPanel) {
+        detailsPanel.innerHTML = `
+            <h4>Finding Ignored</h4>
+            <p>This finding was marked as a false positive.</p>
+            <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
+            <button id="undo-ignore-button" class="secondary-button">
+                Undo Last Ignore
+            </button>
+        `;
+
+        document
+            .getElementById("undo-ignore-button")
+            .addEventListener("click", undoLastIgnoredSpot);
+    }
+
+    setStatus("Finding ignored and grade estimate adjusted.");
 }
 
+    setStatus("Finding ignored and grade estimate adjusted.");
+
+function undoLastIgnoredSpot() {
+    const lastIgnored = ignoredHistory.pop();
+
+    if (!lastIgnored) {
+        setStatus("No ignored findings to undo.");
+        return;
+    }
+
+    ignoredSpots = ignoredSpots.filter(id => id !== lastIgnored);
+
+    drawIgnoredSpotMarkers();
+    recalculateDisplayedGrade();
+
+    const detailsPanel = document.getElementById("finding-details");
+
+    if (detailsPanel) {
+        detailsPanel.innerHTML = `
+            <h4>Ignore Undone</h4>
+            <p>The last ignored finding was restored.</p>
+            <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
+        `;
+    }
+
+    setStatus("Last ignored finding restored.");
+}
 
 function handleOverlayClick(event) {
     if (!latestData || !overlayImage || !overlayImage.src) return;
@@ -347,6 +402,11 @@ if (overlayImage) {
 }
 
 
+if (resetCorrectionsButton) {
+    resetCorrectionsButton.addEventListener("click", resetCorrections);
+}
+
+
 initManualCenteringCanvas();
 resetAllUI();
 updateAnalyzeButtonState();
@@ -360,6 +420,7 @@ frontUpload.addEventListener("change", (event) => {
     frontFile = file;
 
     resetAllUI();
+    ignoredHistory = [];
     loadManualCenteringImage(file, "front");
 
     setStatus("Front image loaded. Adjust the front guide lines, then upload the back image.");
@@ -464,11 +525,13 @@ function drawIgnoredSpotMarkers() {
     if (!source) return;
 
     const rect = overlayImage.getBoundingClientRect();
+
     const scaleX = rect.width / overlayImage.naturalWidth;
     const scaleY = rect.height / overlayImage.naturalHeight;
 
     source.spots.forEach((spot, index) => {
         const id = getSpotId(source, spot, index);
+
         if (!isIgnored(id)) return;
 
         const box = getSpotBox(spot);
@@ -478,23 +541,14 @@ function drawIgnoredSpotMarkers() {
         const w = box.width * scaleX;
         const h = box.height * scaleY;
 
-        correctionCtx.fillStyle = "rgba(255,255,255,0.65)";
-        correctionCtx.fillRect(x, y, w, h);
+        // Paint over ignored finding with surrounding overlay color
+       const sampleX = Math.max(0, Math.floor(x));
+const sampleY = Math.max(0, Math.floor(y));
 
-        correctionCtx.strokeStyle = "#ef4444";
-        correctionCtx.lineWidth = 3;
-        correctionCtx.strokeRect(x, y, w, h);
-
-        correctionCtx.beginPath();
-        correctionCtx.moveTo(x, y);
-        correctionCtx.lineTo(x + w, y + h);
-        correctionCtx.moveTo(x + w, y);
-        correctionCtx.lineTo(x, y + h);
-        correctionCtx.stroke();
+correctionCtx.fillStyle = "rgba(244,246,248,0.98)";
+        correctionCtx.fillRect(x - 2, y - 2, w + 4, h + 4);
     });
 }
-
-
 function recalculateDisplayedGrade() {
     if (!latestData || baseGrade === null) return;
 
@@ -528,4 +582,54 @@ function recalculateDisplayedGrade() {
     document.getElementById("final-grade").textContent = adjustedGrade;
     document.getElementById("grade-summary").textContent =
         `Adjusted after ignoring ${ignoredSpots.length} false-positive finding(s).`;
+}
+function resetCorrections() {
+    ignoredSpots = [];
+    ignoredHistory = [];
+
+    drawIgnoredSpotMarkers();
+
+    if (latestData) {
+        updateFinalGradeUI(latestData);
+    }
+
+    const detailsPanel = document.getElementById("finding-details");
+
+    if (detailsPanel) {
+        detailsPanel.innerHTML = `
+            <h4>Finding Details</h4>
+            <p>All corrections were reset.</p>
+            <button id="reset-corrections-button" class="secondary-button">
+                Reset Corrections
+            </button>
+        `;
+
+        document
+            .getElementById("reset-corrections-button")
+            .addEventListener("click", resetCorrections);
+    }
+
+    setStatus("Corrections reset.");
+}
+function updateFindingSummary() {
+    const detailsPanel = document.getElementById("finding-details");
+    if (!detailsPanel || !latestData) return;
+
+    const source = getCurrentSpotSource();
+
+    if (!source) {
+        detailsPanel.innerHTML = `
+            <h4>Finding Details</h4>
+            <p>This overlay has no clickable findings.</p>
+        `;
+        return;
+    }
+
+    detailsPanel.innerHTML = `
+        <h4>Finding Details</h4>
+        <p><strong>Overlay:</strong> ${source.side} ${source.type}</p>
+        <p><strong>Detected findings:</strong> ${source.spots.length}</p>
+        <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
+        <p class="hint">Click a box to inspect it. Shift-click to ignore it.</p>
+    `;
 }

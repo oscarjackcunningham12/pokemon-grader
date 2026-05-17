@@ -64,9 +64,6 @@ def get_surface_crop(
     card: np.ndarray,
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
-    """
-    Surface analysis should only inspect the inner selected card area.
-    """
     if regions and "surface" in regions:
         region = regions["surface"]
         return crop_region(card, region), (region.x, region.y)
@@ -77,21 +74,16 @@ def get_surface_crop(
 
     return (
         card[margin_y:h - margin_y, margin_x:w - margin_x],
-        (margin_x, margin_y)
+        (margin_x, margin_y),
     )
 
 
 def build_print_edge_mask(gray: np.ndarray) -> np.ndarray:
-    """
-    Detects strong printed design edges/text/logo-like edges so surface detection
-    can ignore them instead of counting them as damage.
-    """
     blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
     strong_edges = cv2.Canny(blurred, 90, 220)
 
     kernel = np.ones((3, 3), np.uint8)
-
     strong_edges = cv2.dilate(strong_edges, kernel, iterations=2)
     strong_edges = cv2.morphologyEx(strong_edges, cv2.MORPH_CLOSE, kernel, iterations=1)
 
@@ -99,25 +91,18 @@ def build_print_edge_mask(gray: np.ndarray) -> np.ndarray:
 
 
 def build_surface_anomaly_mask(image_bgr: np.ndarray) -> np.ndarray:
-    """
-    Finds softer surface anomalies while suppressing normal printed design edges.
-    """
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
-    # Smooth printed texture, then compare against original.
     smooth = cv2.GaussianBlur(gray, (15, 15), 0)
     diff = cv2.absdiff(gray, smooth)
 
-    # Only keep noticeable local irregularities.
     _, anomaly_mask = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
 
     print_edge_mask = build_print_edge_mask(gray)
 
-    # Remove logo/text/artwork hard edges from surface candidate mask.
     anomaly_mask[print_edge_mask > 0] = 0
 
     kernel = np.ones((2, 2), np.uint8)
-
     anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_OPEN, kernel, iterations=1)
     anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
@@ -136,7 +121,6 @@ def detect_surface_damage(
     )
 
     spots = []
-
     crop_area = image_bgr.shape[0] * image_bgr.shape[1]
 
     for contour in contours:
@@ -146,14 +130,12 @@ def detect_surface_damage(
             continue
 
         if area > crop_area * 0.08:
-            # Huge regions are usually lighting/glare/background artifacts.
             continue
 
         x, y, w, h = cv2.boundingRect(contour)
 
         aspect_ratio = max(w, h) / max(1, min(w, h))
 
-        # Ignore tiny long text/logo strokes.
         if aspect_ratio > 14 and area < 80:
             continue
 
@@ -162,13 +144,63 @@ def detect_surface_damage(
     return spots, mask
 
 
+def severity_color(severity: str) -> Tuple[int, int, int]:
+    """
+    OpenCV uses BGR color order.
+    """
+    if severity == "minor":
+        return (0, 255, 255)      # yellow
+    if severity == "moderate":
+        return (0, 165, 255)      # orange
+    if severity == "heavy":
+        return (0, 0, 255)        # red
+
+    return (0, 255, 255)
+
+
+def draw_surface_finding(
+    overlay: np.ndarray,
+    x: int,
+    y: int,
+    w: int,
+    h: int,
+    severity: str
+) -> None:
+    color = severity_color(severity)
+
+    temp = overlay.copy()
+
+    cv2.rectangle(
+        temp,
+        (x, y),
+        (x + w, y + h),
+        color,
+        -1,
+    )
+
+    cv2.addWeighted(temp, 0.24, overlay, 0.76, 0, overlay)
+
+    cv2.rectangle(
+        overlay,
+        (x, y),
+        (x + w, y + h),
+        color,
+        2,
+    )
+
+    cv2.circle(
+        overlay,
+        (x + max(2, w // 2), y + max(2, h // 2)),
+        max(4, min(10, max(w, h) // 3)),
+        color,
+        2,
+    )
+
+
 def analyze_surface(
     card: np.ndarray,
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> SurfaceAnalysisResult:
-    """
-    Surface analysis focused on abnormal marks, not printed artwork/logo edges.
-    """
     overlay = card.copy()
 
     surface_crop, offset = get_surface_crop(card, regions)
@@ -198,18 +230,13 @@ def analyze_surface(
             )
         )
 
-        color = (0, 255, 255)
-        if severity == "moderate":
-            color = (0, 165, 255)
-        elif severity == "heavy":
-            color = (0, 0, 255)
-
-        cv2.rectangle(
+        draw_surface_finding(
             overlay,
-            (global_x, global_y),
-            (global_x + w, global_y + h),
-            color,
-            1,
+            int(global_x),
+            int(global_y),
+            int(w),
+            int(h),
+            severity,
         )
 
     crop_area = surface_crop.shape[0] * surface_crop.shape[1]

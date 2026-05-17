@@ -8,7 +8,9 @@
 <body>
 
     <h1>Pokemon Card Grader</h1>
-    <p class="subtitle">Manual centering, front/back grading, condition scoring, and visual overlays</p>
+    <p class="subtitle">
+        Manual centering, front/back grading, condition scoring, and visual overlays
+    </p>
 
     <!-- Upload -->
     <div class="upload-section">
@@ -28,37 +30,50 @@
 
         <div id="status"></div>
 
-        <button id="analyze-button" disabled>Analyze Card</button>
+        <button id="analyze-button" disabled>
+            Analyze Card
+        </button>
     </div>
 
     <!-- Manual Centering -->
     <div class="manual-centering-section">
-    <h3>Manual Centering Selection</h3>
-    <p>Adjust the guide lines for both the front and back before analyzing.</p>
+        <h3>Manual Centering Selection</h3>
 
-    <div class="centering-canvas-grid">
-        <div class="centering-canvas-card">
-            <h4>Front Centering</h4>
-            <canvas id="front-centering-canvas"></canvas>
-        </div>
+        <p>
+            Adjust the guide lines for both the front and back before analyzing.
+        </p>
 
-        <div class="centering-canvas-card">
-            <h4>Back Centering</h4>
-            <canvas id="back-centering-canvas"></canvas>
+        <div class="centering-canvas-grid">
+
+            <div class="centering-canvas-card">
+                <h4>Front Centering</h4>
+                <canvas id="front-centering-canvas"></canvas>
+            </div>
+
+            <div class="centering-canvas-card">
+                <h4>Back Centering</h4>
+                <canvas id="back-centering-canvas"></canvas>
+            </div>
+
         </div>
     </div>
-</div>
 
     <!-- Final Grade -->
     <div class="final-grade-card">
         <h2>Estimated Final Grade</h2>
+
         <div id="final-grade">-</div>
+
         <p id="grade-label">-</p>
-        <p id="grade-summary">Upload front and back images to generate an estimate.</p>
+
+        <p id="grade-summary">
+            Upload front and back images to generate an estimate.
+        </p>
     </div>
 
     <!-- Score Cards -->
     <div class="score-grid">
+
         <div class="score-card">
             <h3>Centering</h3>
             <p>Horizontal: <span id="horizontal-ratio">-</span></p>
@@ -88,52 +103,109 @@
             <p>Score: <span id="surface-score">-</span></p>
             <p>Issues: <span id="surface-defects">-</span></p>
         </div>
+
     </div>
 
     <!-- Centering Measurements -->
     <div class="measurements">
         <h3>Centering Measurements</h3>
+
         <p>Left: <span id="left">-</span></p>
         <p>Right: <span id="right">-</span></p>
         <p>Top: <span id="top">-</span></p>
         <p>Bottom: <span id="bottom">-</span></p>
     </div>
 
-   <!-- Overlay Switcher -->
-<div class="overlay-switcher">
-    <h3>Overlay View</h3>
+    <!-- Overlay Switcher -->
+    <div class="overlay-switcher">
 
-    <div class="overlay-buttons">
-        <button data-overlay="centering_overlay">Front Centering</button>
-        <button data-overlay="regions_overlay">Front Regions</button>
-        <button data-overlay="edges_overlay">Front Edges</button>
-        <button data-overlay="corners_overlay">Front Corners</button>
-        <button data-overlay="whitening_overlay">Front Whitening</button>
-        <button data-overlay="surface_overlay">Front Surface</button>
-        <button data-overlay="back_centering_overlay">Back Centering</button>
-        <button data-overlay="back_regions_overlay">Back Regions</button>
-        <button data-overlay="back_card">Back Card</button>
-        <button data-overlay="back_edges_overlay">Back Edges</button>
-        <button data-overlay="back_corners_overlay">Back Corners</button>
-        <button data-overlay="back_whitening_overlay">Back Whitening</button>
-        <button data-overlay="back_surface_overlay">Back Surface</button>
-        <button data-overlay="back_centering_overlay">Back Centering</button>
-        <button data-overlay="back_regions_overlay">Back Regions</button>
+        <h3>Overlay View</h3>
+
+        <div class="overlay-buttons">
+
+            <button data-overlay="centering_overlay">
+                Front Centering
+            </button>
+
+            <button data-overlay="regions_overlay">
+                Front Regions
+            </button>
+
+            <button data-overlay="edges_overlay">
+                Front Edges
+            </button>
+
+            <button data-overlay="corners_overlay">
+                Front Corners
+            </button>
+
+            <button data-overlay="whitening_overlay">
+                Front Whitening
+            </button>
+
+            <button data-overlay="surface_overlay">
+                Front Surface
+            </button>
+
+            <button data-overlay="back_card">
+                Back Card
+            </button>
+
+            <button data-overlay="back_centering_overlay">
+                Back Centering
+            </button>
+
+            <button data-overlay="back_regions_overlay">
+                Back Regions
+            </button>
+
+            <button data-overlay="back_edges_overlay">
+                Back Edges
+            </button>
+
+            <button data-overlay="back_corners_overlay">
+                Back Corners
+            </button>
+
+            <button data-overlay="back_whitening_overlay">
+                Back Whitening
+            </button>
+
+            <button data-overlay="back_surface_overlay">
+                Back Surface
+            </button>
+
+        </div>
     </div>
-</div>
+
     <!-- Images -->
     <div class="images">
+
         <div>
             <h3>Processed Card</h3>
             <img id="preview-image" />
         </div>
 
         <div>
-            <h3 id="overlay-title">Centering Overlay</h3>
-             <div class="overlay-frame">
-        <img id="overlay-image" />
-        <canvas id="correction-canvas"></canvas>
+
+            <h3 id="overlay-title">
+                Centering Overlay
+            </h3>
+
+            <div class="overlay-frame">
+                <img id="overlay-image" />
+                <canvas id="correction-canvas"></canvas>
+            </div>
+
+            <div id="finding-details" class="finding-details">
+    <h4>Finding Details</h4>
+    <p>Click a detected box to inspect it.</p>
+    <button id="reset-corrections-button" class="secondary-button">
+        Reset Corrections
+    </button>
+</div>
         </div>
+
     </div>
 
     <script type="module" src="app.js"></script>
