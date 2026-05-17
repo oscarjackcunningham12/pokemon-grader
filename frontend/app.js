@@ -39,10 +39,20 @@ const analyzeButton = document.getElementById("analyze-button");
 const overlayImage = document.getElementById("overlay-image");
 const overlayTitle = document.getElementById("overlay-title");
 const overlayButtons = document.querySelectorAll("[data-overlay]");
+const correctionCanvas = document.getElementById("correction-canvas");
+const correctionCtx = correctionCanvas ? correctionCanvas.getContext("2d") : null;
+
+let baseGrade = null;
 
 let latestImages = null;
+let latestData = null;
+
 let frontFile = null;
 let backFile = null;
+
+let currentOverlayKey = "centering_overlay";
+let ignoredSpots = [];
+
 
 const overlayLabels = {
     centering_overlay: "Front Centering Overlay",
@@ -70,6 +80,9 @@ function resetAllUI() {
     resetCornersUI();
 
     latestImages = null;
+    latestData = null;
+    ignoredSpots = [];
+    currentOverlayKey = "centering_overlay";
 
     if (overlayTitle) {
         overlayTitle.textContent = "Front Centering Overlay";
@@ -94,6 +107,12 @@ function updateAnalyzeButtonState() {
 function setOverlay(overlayKey) {
     if (!latestImages || !latestImages[overlayKey]) return;
 
+    currentOverlayKey = overlayKey;
+
+    overlayImage.onload = () => {
+        syncCorrectionCanvas();
+    };
+
     overlayImage.src = `data:image/png;base64,${latestImages[overlayKey]}`;
 
     if (overlayTitle) {
@@ -106,8 +125,213 @@ function setOverlay(overlayKey) {
 }
 
 
+
 function getFileFromInput(event) {
     return event.target.files[0] || null;
+}
+
+
+function getCurrentSpotSource() {
+    if (!latestData) return null;
+
+    const sourceMap = {
+        edges_overlay: {
+            side: "front",
+            type: "edges",
+            spots: latestData.edges?.spots || []
+        },
+        corners_overlay: {
+            side: "front",
+            type: "corners",
+            spots: latestData.corners?.spots || []
+        },
+        whitening_overlay: {
+            side: "front",
+            type: "whitening",
+            spots: latestData.whitening?.spots || []
+        },
+        surface_overlay: {
+            side: "front",
+            type: "surface",
+            spots: latestData.surface?.spots || []
+        },
+
+        back_edges_overlay: {
+            side: "back",
+            type: "edges",
+            spots: latestData.back?.edges?.spots || []
+        },
+        back_corners_overlay: {
+            side: "back",
+            type: "corners",
+            spots: latestData.back?.corners?.spots || []
+        },
+        back_whitening_overlay: {
+            side: "back",
+            type: "whitening",
+            spots: latestData.back?.whitening?.spots || []
+        },
+        back_surface_overlay: {
+            side: "back",
+            type: "surface",
+            spots: latestData.back?.surface?.spots || []
+        }
+    };
+
+    return sourceMap[currentOverlayKey] || null;
+}
+
+
+function getSpotBox(spot) {
+    const width = spot.width || 14;
+    const height = spot.height || 14;
+
+    return {
+        x: spot.x,
+        y: spot.y,
+        width,
+        height
+    };
+}
+
+
+function getImageClickPosition(event) {
+    const rect = overlayImage.getBoundingClientRect();
+
+    const naturalWidth = overlayImage.naturalWidth;
+    const naturalHeight = overlayImage.naturalHeight;
+
+    const scaleX = naturalWidth / rect.width;
+    const scaleY = naturalHeight / rect.height;
+
+    return {
+        x: (event.clientX - rect.left) * scaleX,
+        y: (event.clientY - rect.top) * scaleY
+    };
+}
+
+
+function getSpotId(source, spot, index) {
+    return `${source.side}:${source.type}:${index}:${spot.x}:${spot.y}`;
+}
+
+
+function isIgnored(spotId) {
+    return ignoredSpots.includes(spotId);
+}
+
+
+function findClickedSpot(x, y, source) {
+    if (!source) return null;
+
+    for (let i = source.spots.length - 1; i >= 0; i--) {
+        const spot = source.spots[i];
+        const id = getSpotId(source, spot, i);
+
+        if (isIgnored(id)) continue;
+
+        const box = getSpotBox(spot);
+
+        if (
+            x >= box.x &&
+            x <= box.x + box.width &&
+            y >= box.y &&
+            y <= box.y + box.height
+        ) {
+            return {
+                spot,
+                index: i,
+                id
+            };
+        }
+    }
+
+    return null;
+}
+
+
+function estimateSpotImpact(source, spot) {
+    const severityImpact = {
+        minor: 0.05,
+        moderate: 0.15,
+        heavy: 0.35,
+        clean: 0
+    };
+
+    const typeMultiplier = {
+        edges: 1.0,
+        corners: 1.15,
+        whitening: 0.9,
+        surface: 0.75
+    };
+
+    const area = spot.area || 0;
+    const areaImpact = Math.min(area / 500, 0.35);
+
+    const severity = spot.severity || "minor";
+
+    const impact =
+        (severityImpact[severity] || 0.08) *
+        (typeMultiplier[source.type] || 1) +
+        areaImpact;
+
+    return Math.round(impact * 100) / 100;
+}
+
+
+function showSpotDetails(source, clicked) {
+    const spot = clicked.spot;
+    const impact = estimateSpotImpact(source, spot);
+
+    const message = [
+        `${source.side.toUpperCase()} ${source.type.toUpperCase()} finding`,
+        `Severity: ${spot.severity || "unknown"}`,
+        `Area: ${spot.area || "unknown"} px`,
+        `Estimated grade impact: -${impact}`,
+        "",
+        "Shift-click this box to ignore it as a false positive."
+    ].join("\n");
+
+    alert(message);
+}
+
+
+function ignoreSpot(spotId) {
+    if (!ignoredSpots.includes(spotId)) {
+        ignoredSpots.push(spotId);
+    }
+
+    drawIgnoredSpotMarkers();
+    recalculateDisplayedGrade();
+
+    setStatus("Finding ignored visually and grade estimate adjusted.");
+}
+
+
+function handleOverlayClick(event) {
+    if (!latestData || !overlayImage || !overlayImage.src) return;
+
+    const source = getCurrentSpotSource();
+
+    if (!source) {
+        setStatus("This overlay does not have clickable findings.");
+        return;
+    }
+
+    const pos = getImageClickPosition(event);
+    const clicked = findClickedSpot(pos.x, pos.y, source);
+
+    if (!clicked) {
+        setStatus("No finding selected.");
+        return;
+    }
+
+    if (event.shiftKey) {
+        ignoreSpot(clicked.id);
+        return;
+    }
+
+    showSpotDetails(source, clicked);
 }
 
 
@@ -116,6 +340,11 @@ overlayButtons.forEach(button => {
         setOverlay(button.dataset.overlay);
     });
 });
+
+
+if (overlayImage) {
+    overlayImage.addEventListener("click", handleOverlayClick);
+}
 
 
 initManualCenteringCanvas();
@@ -189,8 +418,10 @@ analyzeButton.addEventListener("click", async () => {
             return;
         }
 
-        setStatus("Done");
+        setStatus("Done. Click a finding box for details. Shift-click to ignore visually.");
 
+        latestData = data;
+        baseGrade = data.final_grade.final_grade;
         latestImages = data.images;
 
         setBaseImages(data.images);
@@ -209,3 +440,92 @@ analyzeButton.addEventListener("click", async () => {
         setStatus("Could not connect to backend. Make sure Flask is running.");
     }
 });
+
+function syncCorrectionCanvas() {
+    if (!correctionCanvas || !overlayImage) return;
+
+    const rect = overlayImage.getBoundingClientRect();
+
+    correctionCanvas.width = rect.width;
+    correctionCanvas.height = rect.height;
+    correctionCanvas.style.width = `${rect.width}px`;
+    correctionCanvas.style.height = `${rect.height}px`;
+
+    drawIgnoredSpotMarkers();
+}
+
+
+function drawIgnoredSpotMarkers() {
+    if (!correctionCtx || !correctionCanvas || !overlayImage) return;
+
+    correctionCtx.clearRect(0, 0, correctionCanvas.width, correctionCanvas.height);
+
+    const source = getCurrentSpotSource();
+    if (!source) return;
+
+    const rect = overlayImage.getBoundingClientRect();
+    const scaleX = rect.width / overlayImage.naturalWidth;
+    const scaleY = rect.height / overlayImage.naturalHeight;
+
+    source.spots.forEach((spot, index) => {
+        const id = getSpotId(source, spot, index);
+        if (!isIgnored(id)) return;
+
+        const box = getSpotBox(spot);
+
+        const x = box.x * scaleX;
+        const y = box.y * scaleY;
+        const w = box.width * scaleX;
+        const h = box.height * scaleY;
+
+        correctionCtx.fillStyle = "rgba(255,255,255,0.65)";
+        correctionCtx.fillRect(x, y, w, h);
+
+        correctionCtx.strokeStyle = "#ef4444";
+        correctionCtx.lineWidth = 3;
+        correctionCtx.strokeRect(x, y, w, h);
+
+        correctionCtx.beginPath();
+        correctionCtx.moveTo(x, y);
+        correctionCtx.lineTo(x + w, y + h);
+        correctionCtx.moveTo(x + w, y);
+        correctionCtx.lineTo(x, y + h);
+        correctionCtx.stroke();
+    });
+}
+
+
+function recalculateDisplayedGrade() {
+    if (!latestData || baseGrade === null) return;
+
+    let restoredPoints = 0;
+
+    Object.keys(overlayLabels).forEach(() => {});
+
+    const sources = [
+        { side: "front", type: "edges", spots: latestData.edges?.spots || [] },
+        { side: "front", type: "corners", spots: latestData.corners?.spots || [] },
+        { side: "front", type: "whitening", spots: latestData.whitening?.spots || [] },
+        { side: "front", type: "surface", spots: latestData.surface?.spots || [] },
+        { side: "back", type: "edges", spots: latestData.back?.edges?.spots || [] },
+        { side: "back", type: "corners", spots: latestData.back?.corners?.spots || [] },
+        { side: "back", type: "whitening", spots: latestData.back?.whitening?.spots || [] },
+        { side: "back", type: "surface", spots: latestData.back?.surface?.spots || [] }
+    ];
+
+    sources.forEach(source => {
+        source.spots.forEach((spot, index) => {
+            const id = getSpotId(source, spot, index);
+
+            if (isIgnored(id)) {
+                restoredPoints += estimateSpotImpact(source, spot);
+            }
+        });
+    });
+
+    const adjustedGrade = Math.min(10, Math.round((baseGrade + restoredPoints) * 10) / 10);
+
+    document.getElementById("final-grade").textContent = adjustedGrade;
+    document.getElementById("grade-summary").textContent =
+        `Adjusted after ignoring ${ignoredSpots.length} false-positive finding(s).`;
+}

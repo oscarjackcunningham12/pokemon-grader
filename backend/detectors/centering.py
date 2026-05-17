@@ -43,7 +43,6 @@ def centering_ratio(a: int, b: int) -> str:
 def find_card_corners(image: np.ndarray) -> Optional[np.ndarray]:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
-
     edges = cv2.Canny(blur, 40, 130)
 
     kernel = np.ones((5, 5), np.uint8)
@@ -87,7 +86,6 @@ def estimate_border_thickness(
     roi_pct: float = 0.22
 ) -> Optional[int]:
     h, w = card.shape[:2]
-
     hsv = cv2.cvtColor(card, cv2.COLOR_BGR2HSV)
 
     if side in ("left", "right"):
@@ -171,76 +169,27 @@ def draw_manual_line_overlay(
 
     normalized = normalize_centering_lines(manual_lines, w, h)
 
-    line_color_green = (0, 255, 0)
-    line_color_blue = (255, 180, 0)
-    inner_color = (255, 255, 255)
+    green = (0, 255, 0)
+    blue = (255, 180, 0)
+    white = (255, 255, 255)
 
-    # Outer and inner vertical guides
-    cv2.line(
-        overlay,
-        (normalized.left_outer, 0),
-        (normalized.left_outer, h - 1),
-        line_color_green,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (normalized.left_inner, 0),
-        (normalized.left_inner, h - 1),
-        line_color_green,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (normalized.right_inner, 0),
-        (normalized.right_inner, h - 1),
-        line_color_blue,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (normalized.right_outer, 0),
-        (normalized.right_outer, h - 1),
-        line_color_blue,
-        stroke_width,
-    )
+    cv2.line(overlay, (normalized.left_outer, 0), (normalized.left_outer, h - 1), green, stroke_width)
+    cv2.line(overlay, (normalized.left_inner, 0), (normalized.left_inner, h - 1), green, stroke_width)
 
-    # Outer and inner horizontal guides
-    cv2.line(
-        overlay,
-        (0, normalized.top_outer),
-        (w - 1, normalized.top_outer),
-        line_color_green,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (0, normalized.top_inner),
-        (w - 1, normalized.top_inner),
-        line_color_green,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (0, normalized.bottom_inner),
-        (w - 1, normalized.bottom_inner),
-        line_color_blue,
-        stroke_width,
-    )
-    cv2.line(
-        overlay,
-        (0, normalized.bottom_outer),
-        (w - 1, normalized.bottom_outer),
-        line_color_blue,
-        stroke_width,
-    )
+    cv2.line(overlay, (normalized.right_inner, 0), (normalized.right_inner, h - 1), blue, stroke_width)
+    cv2.line(overlay, (normalized.right_outer, 0), (normalized.right_outer, h - 1), blue, stroke_width)
 
-    # Inner frame
+    cv2.line(overlay, (0, normalized.top_outer), (w - 1, normalized.top_outer), green, stroke_width)
+    cv2.line(overlay, (0, normalized.top_inner), (w - 1, normalized.top_inner), green, stroke_width)
+
+    cv2.line(overlay, (0, normalized.bottom_inner), (w - 1, normalized.bottom_inner), blue, stroke_width)
+    cv2.line(overlay, (0, normalized.bottom_outer), (w - 1, normalized.bottom_outer), blue, stroke_width)
+
     cv2.rectangle(
         overlay,
         (normalized.left_inner, normalized.top_inner),
         (normalized.right_inner, normalized.bottom_inner),
-        inner_color,
+        white,
         stroke_width,
     )
 
@@ -252,24 +201,18 @@ def analyze_centering(
     manual_lines: Optional[dict] = None
 ) -> AnalysisResult:
     """
-    If manual lines are provided, those lines are the source of truth for
-    centering measurements. Auto-detection is only used to straighten/crop the
-    card if possible.
+    Manual mode:
+    - Uses uploaded/resized image as-is.
+    - Does NOT auto-warp/crop.
+    - Prevents back card/logo detection from cropping incorrectly.
 
-    If no manual lines are provided, the function falls back to auto-estimated
-    borders.
+    Auto mode:
+    - Uses computer vision to find card corners and estimate borders.
     """
-    corners = find_card_corners(image_bgr)
-
-    if corners is not None:
-        card = four_point_transform(image_bgr, corners)
-        card = resize_for_display(card)
-    else:
-        # Manual mode can still work even if auto corner detection fails.
-        # Use the uploaded image as-is instead of throwing.
-        card = resize_for_display(image_bgr)
 
     if manual_lines:
+        card = resize_for_display(image_bgr)
+
         h, w = card.shape[:2]
 
         measurements = centering_measurements_from_lines(
@@ -296,10 +239,15 @@ def analyze_centering(
             confidence_note="Manual centering lines used.",
         )
 
+    corners = find_card_corners(image_bgr)
+
     if corners is None:
         raise ValueError(
             "Could not detect the outer card edges. Try a cleaner background or use manual centering."
         )
+
+    card = four_point_transform(image_bgr, corners)
+    card = resize_for_display(card)
 
     left = estimate_border_thickness(card, "left")
     right = estimate_border_thickness(card, "right")

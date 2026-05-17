@@ -144,15 +144,6 @@ h3 {
     font-size: 14px;
 }
 
-#manual-centering-canvas {
-    width: 100%;
-    max-width: 900px;
-    border: 1px solid #d0d5dd;
-    border-radius: 16px;
-    background: #ffffff;
-    cursor: crosshair;
-}
-
 
 .overlay-buttons {
     display: flex;
@@ -281,4 +272,16 @@ h3 {
     border-radius: 16px;
     background: #ffffff;
     cursor: crosshair;
+}
+
+.overlay-frame {
+    position: relative;
+    display: inline-block;
+}
+
+#correction-canvas {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
 }

@@ -1,5 +1,4 @@
-from dataclasses import dataclass, asdict
-from typing import Dict
+from dataclasses import dataclass
 
 
 @dataclass
@@ -7,66 +6,46 @@ class FinalGradeResult:
     final_grade: float
     grade_label: str
     grade_bucket: str
-    subgrades: Dict[str, float]
-    weights: Dict[str, float]
     summary: str
 
 
-def score_centering(horizontal_ratio: str, vertical_ratio: str) -> float:
+def parse_ratio(ratio: str) -> tuple[int, int]:
+    try:
+        left, right = ratio.split("/")
+        return int(left), int(right)
+    except Exception:
+        return 50, 50
+
+
+def centering_penalty(horizontal_ratio: str, vertical_ratio: str) -> float:
+    h1, h2 = parse_ratio(horizontal_ratio)
+    v1, v2 = parse_ratio(vertical_ratio)
+
+    h_off = abs(h1 - h2)
+    v_off = abs(v1 - v2)
+
+    penalty = 0
+
+    penalty += max(0, h_off - 5) * 0.045
+    penalty += max(0, v_off - 5) * 0.045
+
+    return min(penalty, 1.25)
+
+
+def detector_penalty(score: float, weight: float) -> float:
     """
-    Converts centering ratios like '45/55' into a 1-10 score.
-    Perfect is 50/50.
+    Converts a detector score into a grade penalty.
+
+    Example:
+    detector score 9.0 with weight 0.6 = small penalty
+    detector score 5.0 with weight 0.6 = larger penalty
+
+    This is intentionally softer so one small defect does not crush the grade.
     """
-    def ratio_penalty(ratio: str) -> float:
-        try:
-            left, right = ratio.split("/")
-            a = int(left)
-            b = int(right)
-            off_by = abs(a - b)
-            return off_by
-        except Exception:
-            return 20
+    score = max(1.0, min(10.0, float(score)))
+    quality_loss = 10.0 - score
 
-    h_penalty = ratio_penalty(horizontal_ratio)
-    v_penalty = ratio_penalty(vertical_ratio)
-
-    total_penalty = (h_penalty * 0.6) + (v_penalty * 0.4)
-
-    score = 10 - (total_penalty * 0.12)
-    return round(max(1.0, min(10.0, score)), 1)
-
-
-def label_grade(score: float) -> tuple[str, str]:
-    if score >= 9.5:
-        return "Gem Mint", "10"
-    if score >= 9.0:
-        return "Mint", "9"
-    if score >= 8.0:
-        return "Near Mint-Mint", "8"
-    if score >= 7.0:
-        return "Near Mint", "7"
-    if score >= 6.0:
-        return "Excellent-Mint", "6"
-    if score >= 5.0:
-        return "Excellent", "5"
-    if score >= 4.0:
-        return "Very Good-Excellent", "4"
-    if score >= 3.0:
-        return "Very Good", "3"
-    if score >= 2.0:
-        return "Good", "2"
-    return "Poor-Fair", "1"
-
-
-def build_grade_summary(final_grade: float, subgrades: Dict[str, float]) -> str:
-    weakest = min(subgrades, key=subgrades.get)
-    strongest = max(subgrades, key=subgrades.get)
-
-    return (
-        f"Estimated grade is {final_grade}. "
-        f"Strongest category: {strongest} ({subgrades[strongest]}). "
-        f"Weakest category: {weakest} ({subgrades[weakest]})."
-    )
+    return quality_loss * weight
 
 
 def calculate_final_grade(
@@ -77,60 +56,82 @@ def calculate_final_grade(
     whitening_score: float,
     surface_score: float,
 ) -> FinalGradeResult:
-    """
-    Produces an estimated collector-style grade.
+    grade = 10.0
 
-    This is not an official PSA/BGS/CGC grade.
-    It is a local heuristic estimate based on detected visual signals.
-    """
-
-    centering_score = score_centering(
+    grade -= centering_penalty(
         centering_horizontal_ratio,
         centering_vertical_ratio,
     )
 
-    subgrades = {
-        "centering": centering_score,
-        "edges": float(edges_score),
-        "corners": float(corners_score),
-        "whitening": float(whitening_score),
-        "surface": float(surface_score),
-    }
+    grade -= detector_penalty(edges_score, 0.18)
+    grade -= detector_penalty(corners_score, 0.22)
+    grade -= detector_penalty(whitening_score, 0.18)
+    grade -= detector_penalty(surface_score, 0.14)
 
-    weights = {
-        "centering": 0.20,
-        "edges": 0.20,
-        "corners": 0.25,
-        "whitening": 0.15,
-        "surface": 0.20,
-    }
-
-    weighted_score = sum(
-        subgrades[key] * weights[key]
-        for key in subgrades
-    )
-
-    # Penalize heavily if one category is much weaker.
-    weakest_score = min(subgrades.values())
-    if weakest_score < 6.5:
-        weighted_score = min(weighted_score, weakest_score + 1.0)
-    elif weakest_score < 8.0:
-        weighted_score = min(weighted_score, weakest_score + 1.3)
-    elif weakest_score < 9.0:
-        weighted_score = min(weighted_score, weakest_score + 1.5)
-
-    final_grade = round(max(1.0, min(10.0, weighted_score)), 1)
-    grade_label, grade_bucket = label_grade(final_grade)
+    grade = round(max(1.0, min(10.0, grade)), 1)
 
     return FinalGradeResult(
-        final_grade=final_grade,
-        grade_label=grade_label,
-        grade_bucket=grade_bucket,
-        subgrades=subgrades,
-        weights=weights,
-        summary=build_grade_summary(final_grade, subgrades),
+        final_grade=grade,
+        grade_label=grade_to_label(grade),
+        grade_bucket=grade_to_bucket(grade),
+        summary=grade_summary(grade),
     )
+
+
+def grade_to_label(grade: float) -> str:
+    if grade >= 9.5:
+        return "Gem Mint"
+    if grade >= 9.0:
+        return "Mint"
+    if grade >= 8.0:
+        return "Near Mint-Mint"
+    if grade >= 7.0:
+        return "Near Mint"
+    if grade >= 6.0:
+        return "Excellent-Mint"
+    if grade >= 5.0:
+        return "Excellent"
+    if grade >= 4.0:
+        return "Very Good-Excellent"
+    if grade >= 3.0:
+        return "Very Good"
+    if grade >= 2.0:
+        return "Good"
+    return "Poor"
+
+
+def grade_to_bucket(grade: float) -> str:
+    if grade >= 9.5:
+        return "Premium"
+    if grade >= 8.0:
+        return "High Grade"
+    if grade >= 6.0:
+        return "Mid Grade"
+    if grade >= 4.0:
+        return "Lower Grade"
+    return "Heavily Played"
+
+
+def grade_summary(grade: float) -> str:
+    if grade >= 9.5:
+        return "Strong condition with excellent centering and minimal visible flaws."
+    if grade >= 9.0:
+        return "Very strong condition with only minor flaws detected."
+    if grade >= 8.0:
+        return "Good condition with some visible imperfections."
+    if grade >= 7.0:
+        return "Moderate flaws detected, but still a solid-looking card."
+    if grade >= 6.0:
+        return "Noticeable condition issues were detected."
+    if grade >= 4.0:
+        return "Multiple visible flaws were detected across the card."
+    return "Heavy wear or major flaws were detected."
 
 
 def final_grade_to_dict(result: FinalGradeResult) -> dict:
-    return asdict(result)
+    return {
+        "final_grade": result.final_grade,
+        "grade_label": result.grade_label,
+        "grade_bucket": result.grade_bucket,
+        "summary": result.summary,
+    }
