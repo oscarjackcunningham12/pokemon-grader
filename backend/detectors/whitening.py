@@ -39,9 +39,9 @@ def classify_severity(score: float) -> str:
 
 
 def classify_spot(area: int) -> str:
-    if area < 10:
+    if area < 12:
         return "minor"
-    if area < 40:
+    if area < 45:
         return "moderate"
     return "heavy"
 
@@ -53,18 +53,37 @@ def score_whitening(spot_count: int, total_area: int, image_area: int) -> float:
     area_ratio = total_area / image_area
 
     penalty = 0
-    penalty += spot_count * 0.10
-    penalty += area_ratio * 80
+    penalty += spot_count * 0.08
+    penalty += area_ratio * 65
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)
 
 
+def build_print_edge_mask(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Masks strong printed edges so logo/text/artwork highlights are less likely
+    to be counted as whitening.
+    """
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    edges = cv2.Canny(blur, 90, 220)
+
+    kernel = np.ones((3, 3), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
+
+    return edges
+
+
 def detect_whitening_mask(
     image_bgr: np.ndarray,
-    brightness_threshold: int = 210,
-    saturation_threshold: int = 75,
+    brightness_threshold: int = 218,
+    saturation_threshold: int = 60,
 ) -> np.ndarray:
+    """
+    Finds low-saturation bright marks, but suppresses printed design edges.
+    """
     hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
 
     saturation = hsv[:, :, 1]
@@ -75,27 +94,45 @@ def detect_whitening_mask(
 
     mask = np.logical_and(bright_mask, low_sat_mask).astype(np.uint8) * 255
 
+    print_edge_mask = build_print_edge_mask(image_bgr)
+
+    # Ignore hard printed edges/logos/text.
+    mask[print_edge_mask > 0] = 0
+
     kernel = np.ones((2, 2), np.uint8)
+
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, kernel, iterations=1)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
     return mask
 
 
 def extract_whitening_spots(
     mask: np.ndarray,
-    min_area: int = 5,
+    min_area: int = 6,
 ) -> List[Tuple[int, int, int, int, int]]:
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
 
     spots = []
 
     for contour in contours:
         area = int(cv2.contourArea(contour))
+
         if area < min_area:
             continue
 
         x, y, w, h = cv2.boundingRect(contour)
+
+        # Filter tiny printed specks or text-like strokes.
+        aspect_ratio = max(w, h) / max(1, min(w, h))
+
+        if aspect_ratio > 10 and area < 45:
+            continue
+
         spots.append((x, y, w, h, area))
 
     return spots
@@ -106,8 +143,8 @@ def get_whitening_regions(
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> Dict[str, Tuple[np.ndarray, Tuple[int, int]]]:
     """
-    Whitening should mostly analyze edges and corners.
-    This prevents bright artwork/text areas from being mistaken for whitening.
+    Whitening should only analyze edge/corner regions.
+    It should NOT analyze logos, art boxes, or inner card text.
     """
     if regions:
         keys = [
@@ -132,10 +169,11 @@ def get_whitening_regions(
             return selected
 
     h, w = card.shape[:2]
-    edge_w = max(8, int(w * 0.04))
-    edge_h = max(8, int(h * 0.04))
-    corner_w = max(20, int(w * 0.12))
-    corner_h = max(20, int(h * 0.12))
+
+    edge_w = max(8, int(w * 0.035))
+    edge_h = max(8, int(h * 0.035))
+    corner_w = max(20, int(w * 0.10))
+    corner_h = max(20, int(h * 0.10))
 
     return {
         "left_edge": (card[:, :edge_w], (0, 0)),
@@ -153,9 +191,6 @@ def analyze_whitening(
     card: np.ndarray,
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> WhiteningAnalysisResult:
-    """
-    Whitening detection focused on selected edge/corner regions.
-    """
     overlay = card.copy()
 
     whitening_regions = get_whitening_regions(card, regions)
@@ -191,11 +226,17 @@ def analyze_whitening(
                 )
             )
 
+            color = (255, 255, 0)
+            if severity == "moderate":
+                color = (0, 165, 255)
+            elif severity == "heavy":
+                color = (0, 0, 255)
+
             cv2.rectangle(
                 overlay,
                 (global_x, global_y),
                 (global_x + w, global_y + h),
-                (255, 255, 0),
+                color,
                 1,
             )
 

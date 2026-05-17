@@ -43,6 +43,14 @@ def classify_severity(score: float) -> str:
     return "heavy"
 
 
+def classify_spot(area: int) -> str:
+    if area < 12:
+        return "minor"
+    if area < 45:
+        return "moderate"
+    return "heavy"
+
+
 def score_edge(spot_count: int, total_area: int, edge_area: int) -> float:
     if edge_area <= 0:
         return 0.0
@@ -50,8 +58,8 @@ def score_edge(spot_count: int, total_area: int, edge_area: int) -> float:
     area_ratio = total_area / edge_area
 
     penalty = 0
-    penalty += spot_count * 0.15
-    penalty += area_ratio * 35
+    penalty += spot_count * 0.10
+    penalty += area_ratio * 45
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)
@@ -60,7 +68,7 @@ def score_edge(spot_count: int, total_area: int, edge_area: int) -> float:
 def crop_edge_strip(
     card: np.ndarray,
     side: str,
-    strip_ratio: float = 0.04
+    strip_ratio: float = 0.035
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
     h, w = card.shape[:2]
 
@@ -87,10 +95,6 @@ def get_edge_crop(
     side: str,
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
-    """
-    If manual centering regions exist, use those.
-    Otherwise fall back to automatic outer strips.
-    """
     if regions:
         key = f"{side}_edge"
         if key in regions:
@@ -100,11 +104,27 @@ def get_edge_crop(
     return crop_edge_strip(card, side)
 
 
-def detect_whitening_in_strip(
+def build_print_edge_mask(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Suppresses printed text/logo/art edges so they are less likely to be
+    counted as edge damage.
+    """
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+
+    edges = cv2.Canny(blur, 90, 220)
+
+    kernel = np.ones((3, 3), np.uint8)
+    edges = cv2.dilate(edges, kernel, iterations=1)
+
+    return edges
+
+
+def detect_edge_whitening(
     strip: np.ndarray,
-    min_area: int = 4,
-    brightness_threshold: int = 205,
-    saturation_threshold: int = 80,
+    min_area: int = 6,
+    brightness_threshold: int = 215,
+    saturation_threshold: int = 65,
 ) -> Tuple[List[Tuple[int, int, int, int, int]], np.ndarray]:
     hsv = cv2.cvtColor(strip, cv2.COLOR_BGR2HSV)
 
@@ -116,47 +136,46 @@ def detect_whitening_in_strip(
 
     mask = np.logical_and(bright_mask, low_sat_mask).astype(np.uint8) * 255
 
+    print_edge_mask = build_print_edge_mask(strip)
+
+    # Remove printed line/logo/text edges from detection candidates.
+    mask[print_edge_mask > 0] = 0
+
     kernel = np.ones((2, 2), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel, iterations=1)
-    mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, kernel, iterations=1)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        mask,
+        cv2.RETR_EXTERNAL,
+        cv2.CHAIN_APPROX_SIMPLE,
+    )
 
     spots = []
+
     for contour in contours:
         area = int(cv2.contourArea(contour))
+
         if area < min_area:
             continue
 
         x, y, w, h = cv2.boundingRect(contour)
+
+        aspect_ratio = max(w, h) / max(1, min(w, h))
+
+        # Thin long printed strokes near edges are often text/logo, not damage.
+        if aspect_ratio > 12 and area < 55:
+            continue
+
         spots.append((x, y, w, h, area))
 
     return spots, mask
-
-
-def classify_spot(area: int) -> str:
-    if area < 10:
-        return "minor"
-    if area < 35:
-        return "moderate"
-    return "heavy"
 
 
 def analyze_edges(
     card: np.ndarray,
     regions: Optional[Dict[str, RegionBox]] = None
 ) -> EdgeAnalysisResult:
-    """
-    Analyze edge whitening/chipping.
-
-    If regions are provided from manual centering, this uses:
-    - left_edge
-    - right_edge
-    - top_edge
-    - bottom_edge
-
-    Otherwise it falls back to automatic outer strips.
-    """
     overlay = card.copy()
 
     sides = {}
@@ -166,7 +185,7 @@ def analyze_edges(
         strip, offset = get_edge_crop(card, side, regions)
         offset_x, offset_y = offset
 
-        raw_spots, _ = detect_whitening_in_strip(strip)
+        raw_spots, _ = detect_edge_whitening(strip)
 
         total_area = 0
 
@@ -187,11 +206,17 @@ def analyze_edges(
                 )
             )
 
+            color = (0, 255, 255)
+            if severity == "moderate":
+                color = (0, 165, 255)
+            elif severity == "heavy":
+                color = (0, 0, 255)
+
             cv2.rectangle(
                 overlay,
                 (global_x, global_y),
                 (global_x + w, global_y + h),
-                (0, 0, 255),
+                color,
                 1,
             )
 

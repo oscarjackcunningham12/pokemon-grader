@@ -32,7 +32,7 @@ export function updateScoreCardsUI(data) {
 
     // Surface
     document.getElementById("surface-score").textContent = data.surface.score;
-    document.getElementById("surface-defects").textContent = data.surface.defect_count;
+   document.getElementById("surface-defects").textContent = data.surface.issue_count;
 }
 
 

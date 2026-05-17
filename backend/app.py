@@ -89,7 +89,27 @@ def analyze_one_side(image_bgr: np.ndarray, manual_lines=None) -> dict:
         "whitening": whitening,
         "surface": surface,
     }
+def ratio_off_center_amount(ratio: str) -> int:
+    try:
+        a, b = ratio.split("/")
+        return abs(int(a) - int(b))
+    except Exception:
+        return 999
 
+
+def worse_centering_ratio(front_ratio: str, back_ratio: str) -> str:
+    """
+    Uses the worse of the front/back centering ratios.
+    Example:
+    front = 48/52
+    back = 42/58
+
+    Result = 42/58
+    """
+    front_off = ratio_off_center_amount(front_ratio)
+    back_off = ratio_off_center_amount(back_ratio)
+
+    return back_ratio if back_off > front_off else front_ratio
 
 def combine_side_scores(front_result: dict, back_result: dict):
     front_centering = front_result["centering"]
@@ -104,8 +124,15 @@ def combine_side_scores(front_result: dict, back_result: dict):
     back_corners = back_result["corners"]
     back_whitening = back_result["whitening"]
 
-    combined_centering_horizontal = front_centering.horizontal_ratio
-    combined_centering_vertical = front_centering.vertical_ratio
+    combined_centering_horizontal = worse_centering_ratio(
+        front_centering.horizontal_ratio,
+        back_centering.horizontal_ratio,
+    )
+
+    combined_centering_vertical = worse_centering_ratio(
+        front_centering.vertical_ratio,
+        back_centering.vertical_ratio,
+    )
 
     combined_edges_score = round(
         (front_edges.overall_score * 0.45) + (back_edges.overall_score * 0.55),
