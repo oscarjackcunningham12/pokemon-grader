@@ -324,28 +324,11 @@ function ignoreSpot(spotId) {
 
     drawCorrectionOverlay();
     recalculateDisplayedGrade();
-
-    const detailsPanel = document.getElementById("finding-details");
-
-    if (detailsPanel) {
-        detailsPanel.innerHTML = `
-            <h4>Finding Ignored</h4>
-            <p>This finding was marked as a false positive.</p>
-            <p><strong>Ignored findings:</strong> ${ignoredSpots.length}</p>
-            <button id="undo-ignore-button" class="secondary-button">
-                Undo Last Ignore
-            </button>
-        `;
-
-        document
-            .getElementById("undo-ignore-button")
-            .addEventListener("click", undoLastIgnoredSpot);
-    }
+    updateFindingSummary();
+    updateCorrectedScoreCards();
 
     setStatus("Finding ignored and grade estimate adjusted.");
 }
-
-    setStatus("Finding ignored and grade estimate adjusted.");
 
 function undoLastIgnoredSpot() {
     const lastIgnored = ignoredHistory.pop();
@@ -600,6 +583,7 @@ function resetCorrections() {
     ignoredHistory = [];
 
    drawCorrectionOverlay();
+    updateCorrectedScoreCards();
 
     if (latestData) {
         updateFinalGradeUI(latestData);
@@ -665,4 +649,38 @@ function getFindingColor(severity) {
         fill: "rgba(234, 179, 8, 0.22)",
         stroke: "#eab308"
     };
+}
+function updateCorrectedScoreCards() {
+    if (!latestData) return;
+
+    const sources = [
+        {
+            type: "surface",
+            elementId: "surface-defects",
+            spots: latestData.surface?.spots || []
+        },
+        {
+            type: "whitening",
+            elementId: "whitening-spots",
+            spots: latestData.whitening?.spots || []
+        }
+    ];
+
+    sources.forEach(source => {
+        const activeCount = source.spots.filter((spot, index) => {
+            const id = getSpotId(
+                { side: "front", type: source.type },
+                spot,
+                index
+            );
+
+            return !isIgnored(id);
+        }).length;
+
+        const element = document.getElementById(source.elementId);
+
+        if (element) {
+            element.textContent = activeCount;
+        }
+    });
 }
