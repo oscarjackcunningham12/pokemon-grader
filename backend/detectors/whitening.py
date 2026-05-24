@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional
 import cv2
 import numpy as np
 
-from utils.regions import RegionBox, crop_region
+from backend.utils.regions import RegionBox, crop_region
 
 
 @dataclass

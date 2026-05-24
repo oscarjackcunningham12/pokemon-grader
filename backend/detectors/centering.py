@@ -4,9 +4,9 @@ from typing import Optional
 import cv2
 import numpy as np
 
-from utils.geometry import four_point_transform
-from utils.image_utils import resize_for_display
-from utils.regions import centering_measurements_from_lines, normalize_centering_lines
+from backend.utils.geometry import four_point_transform
+from backend.utils.image_utils import resize_for_display
+from backend.utils.regions import centering_measurements_from_lines, normalize_centering_lines
 
 
 @dataclass
