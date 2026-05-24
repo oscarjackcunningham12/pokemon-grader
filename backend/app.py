@@ -7,38 +7,38 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from PIL import Image
 
-from detectors.centering import analyze_centering
-from detectors.edges import (
+from backend.detectors.centering import analyze_centering
+from backend.detectors.edges import (
     analyze_edges,
     edge_result_to_dict,
     score_edge,
     classify_severity as classify_edge_severity,
 )
-from detectors.corners import (
+from backend.detectors.corners import (
     analyze_corners,
     corner_result_to_dict,
     score_corner,
     classify_severity as classify_corner_severity,
 )
-from detectors.whitening import (
+from backend.detectors.whitening import (
     analyze_whitening,
     whitening_result_to_dict,
     score_whitening,
     classify_severity as classify_whitening_severity,
 )
-from detectors.surface import (
+from backend.detectors.surface import (
     analyze_surface,
     surface_result_to_dict,
     score_surface,
     classify_severity as classify_surface_severity,
 )
-from utils.image_utils import pil_to_bgr, bgr_to_rgb
-from utils.scoring import (
+from backend.utils.image_utils import pil_to_bgr, bgr_to_rgb
+from backend.utils.scoring import (
     calculate_final_grade,
     final_grade_to_dict,
     finding_grade_penalty,
 )
-from utils.regions import build_regions_from_centering_lines, regions_to_dict
+from backend.utils.regions import build_regions_from_centering_lines, regions_to_dict
 from utils.regions_overlay import draw_regions_overlay
 
 
