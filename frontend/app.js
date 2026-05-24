@@ -42,8 +42,7 @@ const overlayButtons = document.querySelectorAll("[data-overlay]");
 const correctionCanvas = document.getElementById("correction-canvas");
 const correctionCtx = correctionCanvas ? correctionCanvas.getContext("2d") : null;
 const resetCorrectionsButton = document.getElementById("reset-corrections-button");
-
-const API_BASE_URL = "http://127.0.0.1:5000";
+const API_BASE_URL = "/api";
 
 let latestImages = null;
 let latestData = null;
