@@ -61,8 +61,8 @@ def score_edge(spot_count: int, total_area: int, edge_area: int) -> float:
     area_ratio = total_area / edge_area
 
     penalty = 0
-    penalty += spot_count * 0.10
-    penalty += area_ratio * 45
+    penalty += spot_count * 0.14
+    penalty += area_ratio * 60
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)

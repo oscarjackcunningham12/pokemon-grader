@@ -61,8 +61,8 @@ def score_corner(spot_count: int, total_area: int, corner_area: int) -> float:
     area_ratio = total_area / corner_area
 
     penalty = 0
-    penalty += spot_count * 0.25
-    penalty += area_ratio * 45
+    penalty += spot_count * 0.35
+    penalty += area_ratio * 65
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)

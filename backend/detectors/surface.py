@@ -54,8 +54,8 @@ def score_surface(issue_count: int, total_area: int, image_area: int) -> float:
     area_ratio = total_area / image_area
 
     penalty = 0
-    penalty += issue_count * 0.08
-    penalty += area_ratio * 35
+    penalty += issue_count * 0.13
+    penalty += area_ratio * 55
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)
@@ -91,17 +91,40 @@ def build_print_edge_mask(gray: np.ndarray) -> np.ndarray:
     return strong_edges
 
 
+def build_print_detail_mask(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Suppresses printed ink and text strokes before surface damage detection.
+    """
+    gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+
+    saturation = hsv[:, :, 1]
+    value = hsv[:, :, 2]
+
+    saturated_ink = np.logical_and(saturation > 55, value < 245)
+    dark_ink = value < 95
+
+    ink_mask = np.logical_or(saturated_ink, dark_ink).astype(np.uint8) * 255
+
+    kernel = np.ones((3, 3), np.uint8)
+    ink_mask = cv2.dilate(ink_mask, kernel, iterations=2)
+
+    print_edge_mask = build_print_edge_mask(gray)
+
+    return cv2.bitwise_or(ink_mask, print_edge_mask)
+
+
 def build_surface_anomaly_mask(image_bgr: np.ndarray) -> np.ndarray:
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY)
 
     smooth = cv2.GaussianBlur(gray, (15, 15), 0)
     diff = cv2.absdiff(gray, smooth)
 
-    _, anomaly_mask = cv2.threshold(diff, 22, 255, cv2.THRESH_BINARY)
+    _, anomaly_mask = cv2.threshold(diff, 26, 255, cv2.THRESH_BINARY)
 
-    print_edge_mask = build_print_edge_mask(gray)
+    print_detail_mask = build_print_detail_mask(image_bgr)
 
-    anomaly_mask[print_edge_mask > 0] = 0
+    anomaly_mask[print_detail_mask > 0] = 0
 
     kernel = np.ones((2, 2), np.uint8)
     anomaly_mask = cv2.morphologyEx(anomaly_mask, cv2.MORPH_OPEN, kernel, iterations=1)
@@ -127,7 +150,7 @@ def detect_surface_damage(
     for contour in contours:
         area = int(cv2.contourArea(contour))
 
-        if area < 10:
+        if area < 14:
             continue
 
         if area > crop_area * 0.08:

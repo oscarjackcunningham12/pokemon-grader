@@ -45,17 +45,17 @@ def finding_grade_penalty(finding_type: str, severity: str, area: int) -> float:
     If the user ignores a false positive, this exact value should be reversed.
     """
     base_by_severity = {
-        "minor": 0.06,
-        "moderate": 0.16,
-        "heavy": 0.35,
+        "minor": 0.08,
+        "moderate": 0.22,
+        "heavy": 0.45,
         "clean": 0.0,
     }
 
     type_multiplier = {
-        "edges": 1.0,
-        "corners": 1.15,
-        "whitening": 0.9,
-        "surface": 0.75,
+        "edges": 1.05,
+        "corners": 1.25,
+        "whitening": 1.05,
+        "surface": 1.0,
     }
 
     base = base_by_severity.get(severity, 0.08)

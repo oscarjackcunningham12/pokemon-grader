@@ -54,8 +54,8 @@ def score_whitening(spot_count: int, total_area: int, image_area: int) -> float:
     area_ratio = total_area / image_area
 
     penalty = 0
-    penalty += spot_count * 0.08
-    penalty += area_ratio * 65
+    penalty += spot_count * 0.12
+    penalty += area_ratio * 85
 
     score = 10 - penalty
     return round(max(1.0, min(10.0, score)), 1)
