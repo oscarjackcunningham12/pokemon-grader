@@ -561,7 +561,7 @@ def combine_side_scores(front_result: dict, back_result: dict):
     )
 
 
-@app.route("/health", methods=["GET"])
+@app.route("/api/health", methods=["GET"])
 def health():
     return jsonify({"status": "ok"})
 
@@ -582,7 +582,7 @@ def recalculate_corrections_route():
         return jsonify({"error": str(exc)}), 500
 
 
-@app.route("/analyze/full", methods=["POST"])
+@app.route("/api/analyze/full", methods=["POST"])
 def analyze_full_route():
     try:
         front_manual_lines = get_json_field("front_manual_lines")
@@ -727,7 +727,7 @@ def analyze_full_route():
         return jsonify({"error": str(exc)}), 500
 
 
-@app.route("/analyze/centering", methods=["POST"])
+@app.route("/api/analyze/centering", methods=["POST"])
 def analyze_centering_route():
     if "image" not in request.files:
         return jsonify({"error": "No image uploaded."}), 400
