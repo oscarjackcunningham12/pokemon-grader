@@ -42,7 +42,11 @@ const overlayButtons = document.querySelectorAll("[data-overlay]");
 const correctionCanvas = document.getElementById("correction-canvas");
 const correctionCtx = correctionCanvas ? correctionCanvas.getContext("2d") : null;
 const resetCorrectionsButton = document.getElementById("reset-corrections-button");
-const API_BASE_URL = "/api";
+const LOCAL_API_BASE_URL = "http://127.0.0.1:5000";
+const PRODUCTION_API_BASE_URL = "https://pokemon-grader-t1ky.onrender.com";
+const API_BASE_URL = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
+    ? LOCAL_API_BASE_URL
+    : PRODUCTION_API_BASE_URL;
 
 let latestImages = null;
 let latestData = null;
@@ -445,7 +449,7 @@ analyzeButton.addEventListener("click", async () => {
     );
 
     try {
-        const response = await fetch(`${API_BASE_URL}/analyze/full`, {
+        const response = await fetch(`${API_BASE_URL}/api/analyze/full`, {
             method: "POST",
             body: formData
         });
@@ -585,7 +589,7 @@ async function recalculateCorrections() {
     correctionRequestId = requestId;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/corrections/recalculate`, {
+        const response = await fetch(`${API_BASE_URL}/api/corrections/recalculate`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
