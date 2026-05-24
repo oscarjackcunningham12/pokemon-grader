@@ -43,7 +43,7 @@ const correctionCanvas = document.getElementById("correction-canvas");
 const correctionCtx = correctionCanvas ? correctionCanvas.getContext("2d") : null;
 const resetCorrectionsButton = document.getElementById("reset-corrections-button");
 
-let baseGrade = null;
+const API_BASE_URL = "http://127.0.0.1:5000";
 
 let latestImages = null;
 let latestData = null;
@@ -54,6 +54,7 @@ let backFile = null;
 let currentOverlayKey = "centering_overlay";
 let ignoredSpots = [];
 let ignoredHistory = [];
+let correctionRequestId = 0;
 
 
 const overlayLabels = {
@@ -84,6 +85,7 @@ function resetAllUI() {
     latestImages = null;
     latestData = null;
     ignoredSpots = [];
+    correctionRequestId += 1;
     currentOverlayKey = "centering_overlay";
 
     if (overlayTitle) {
@@ -294,22 +296,24 @@ function showSpotDetails(source, clicked) {
 }
 
 
-function ignoreSpot(spotId) {
+async function ignoreSpot(spotId) {
     if (!ignoredSpots.includes(spotId)) {
         ignoredSpots.push(spotId);
         ignoredHistory.push(spotId);
     }
 
     drawCorrectionOverlay();
-    recalculateDisplayedGrade();
     updateFindingSummary();
-    updateCorrectedScoreCards();
     showCorrectionSummary();
 
-    setStatus("Finding ignored and grade estimate adjusted.");
+    setStatus("Finding ignored. Recalculating grade...");
+
+    if (await recalculateCorrections()) {
+        setStatus("Finding ignored and grade adjusted.");
+    }
 }
 
-function undoLastIgnoredSpot() {
+async function undoLastIgnoredSpot() {
     const lastIgnored = ignoredHistory.pop();
 
     if (!lastIgnored) {
@@ -320,7 +324,6 @@ function undoLastIgnoredSpot() {
     ignoredSpots = ignoredSpots.filter(id => id !== lastIgnored);
 
     drawCorrectionOverlay();
-    recalculateDisplayedGrade();
 
     const detailsPanel = document.getElementById("finding-details");
 
@@ -332,7 +335,11 @@ function undoLastIgnoredSpot() {
         `;
     }
 
-    setStatus("Last ignored finding restored.");
+    setStatus("Finding restored. Recalculating grade...");
+
+    if (await recalculateCorrections()) {
+        setStatus("Last ignored finding restored.");
+    }
 }
 
 function handleOverlayClick(event) {
@@ -354,7 +361,7 @@ function handleOverlayClick(event) {
     }
 
     if (event.shiftKey) {
-        ignoreSpot(clicked.id);
+        void ignoreSpot(clicked.id);
         return;
     }
 
@@ -439,7 +446,7 @@ analyzeButton.addEventListener("click", async () => {
     );
 
     try {
-        const response = await fetch("http://127.0.0.1:5000/analyze/full", {
+        const response = await fetch(`${API_BASE_URL}/analyze/full`, {
             method: "POST",
             body: formData
         });
@@ -454,7 +461,6 @@ analyzeButton.addEventListener("click", async () => {
         setStatus("Done. Click a finding box for details. Shift-click to ignore visually.");
 
         latestData = data;
-        baseGrade = data.final_grade.final_grade;
         latestImages = data.images;
 
         setBaseImages(data.images);
@@ -523,53 +529,111 @@ function drawCorrectionOverlay() {
         correctionCtx.strokeRect(x, y, w, h);
     });
 }
-function recalculateDisplayedGrade() {
-    if (!latestData || baseGrade === null) return;
 
-    let restoredPoints = 0;
+function buildCorrectionAnalysisPayload() {
+    if (!latestData) return null;
 
-    const sources = [
-        { side: "front", type: "edges", spots: latestData.edges?.spots || [] },
-        { side: "front", type: "corners", spots: latestData.corners?.spots || [] },
-        { side: "front", type: "whitening", spots: latestData.whitening?.spots || [] },
-        { side: "front", type: "surface", spots: latestData.surface?.spots || [] },
+    return {
+        mode: latestData.mode,
+        centering: latestData.centering,
+        back_centering: latestData.back_centering,
+        edges: latestData.edges,
+        corners: latestData.corners,
+        whitening: latestData.whitening,
+        surface: latestData.surface,
+        back: latestData.back
+    };
+}
 
-        { side: "back", type: "edges", spots: latestData.back?.edges?.spots || [] },
-        { side: "back", type: "corners", spots: latestData.back?.corners?.spots || [] },
-        { side: "back", type: "whitening", spots: latestData.back?.whitening?.spots || [] },
-        { side: "back", type: "surface", spots: latestData.back?.surface?.spots || [] }
-    ];
+function applyCorrectedFinalGrade(adjustedData) {
+    const finalGrade = adjustedData.final_grade;
+    if (!finalGrade) return;
 
-    sources.forEach(source => {
-        source.spots.forEach((spot, index) => {
-            const id = getSpotId(source, spot, index);
-
-            if (isIgnored(id)) {
-                restoredPoints += estimateSpotImpact(source, spot);
-            }
-        });
-    });
-
-    const adjustedGrade =
-        Math.min(
-            10,
-            Math.round((baseGrade + restoredPoints) * 10) / 10
-        );
-
-    document.getElementById("final-grade").textContent = adjustedGrade;
-
+    document.getElementById("final-grade").textContent = finalGrade.final_grade;
+    document.getElementById("grade-label").textContent =
+        `${finalGrade.grade_label} (${finalGrade.grade_bucket})`;
     document.getElementById("grade-summary").textContent =
         `Adjusted after ignoring ${ignoredSpots.length} finding(s).`;
 }
+
+function applyCorrectedScoreCards(adjustedData) {
+    const summary = adjustedData.combined || adjustedData.front;
+    if (!summary) return;
+
+    document.getElementById("horizontal-ratio").textContent =
+        summary.centering?.horizontal_ratio || "-";
+    document.getElementById("vertical-ratio").textContent =
+        summary.centering?.vertical_ratio || "-";
+
+    document.getElementById("edges-score").textContent = summary.edges.overall_score;
+    document.getElementById("edges-severity").textContent = summary.edges.severity;
+
+    document.getElementById("corners-score").textContent = summary.corners.overall_score;
+    document.getElementById("corners-severity").textContent = summary.corners.severity;
+
+    document.getElementById("whitening-score").textContent = summary.whitening.score;
+    document.getElementById("whitening-spots").textContent = summary.whitening.spot_count;
+
+    document.getElementById("surface-score").textContent = summary.surface.score;
+    document.getElementById("surface-defects").textContent = summary.surface.issue_count;
+}
+
+async function recalculateCorrections() {
+    if (!latestData) return false;
+
+    const analysis = buildCorrectionAnalysisPayload();
+    const requestId = correctionRequestId + 1;
+    correctionRequestId = requestId;
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/corrections/recalculate`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                analysis,
+                ignored_spot_ids: ignoredSpots
+            })
+        });
+
+        const adjustedData = await response.json();
+
+        if (requestId !== correctionRequestId) {
+            return false;
+        }
+
+        if (!response.ok || adjustedData.error) {
+            setStatus(`Error: ${adjustedData.error || "Could not recalculate corrections."}`);
+            return false;
+        }
+
+        applyCorrectedFinalGrade(adjustedData);
+        applyCorrectedScoreCards(adjustedData);
+
+        return true;
+
+    } catch (error) {
+        console.error(error);
+
+        if (requestId === correctionRequestId) {
+            setStatus("Could not recalculate corrections. Make sure Flask is running.");
+        }
+
+        return false;
+    }
+}
+
 function resetCorrections() {
     ignoredSpots = [];
     ignoredHistory = [];
+    correctionRequestId += 1;
 
-   drawCorrectionOverlay();
-    updateCorrectedScoreCards();
+    drawCorrectionOverlay();
 
     if (latestData) {
         updateFinalGradeUI(latestData);
+        updateScoreCardsUI(latestData);
     }
 
     const detailsPanel = document.getElementById("finding-details");
@@ -633,33 +697,6 @@ function getFindingColor(severity) {
         stroke: "#eab308"
     };
 }
-function adjustedDetectorScore(originalScore, originalSpots, sourceInfo) {
-    if (!originalSpots || originalSpots.length === 0) {
-        return originalScore;
-    }
-
-    let restoredPenalty = 0;
-
-    originalSpots.forEach((spot, index) => {
-        const id = getSpotId(sourceInfo, spot, index);
-
-        if (isIgnored(id)) {
-            restoredPenalty += estimateSpotImpact(sourceInfo, spot);
-        }
-    });
-
-    const adjustedScore = originalScore + restoredPenalty;
-
-    return Math.min(10, Math.round(adjustedScore * 10) / 10);
-}
-
-function countActiveSpots(spots, sourceInfo) {
-    return spots.filter((spot, index) => {
-        const id = getSpotId(sourceInfo, spot, index);
-        return !isIgnored(id);
-    }).length;
-}
-
 function showCorrectionSummary() {
     const detailsPanel = document.getElementById("finding-details");
     if (!detailsPanel) return;

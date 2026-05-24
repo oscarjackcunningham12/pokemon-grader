@@ -1,6 +1,6 @@
 import numpy as np
 
-from tests.test_geometry import order_points, four_point_transform
+from backend.utils.geometry import order_points, four_point_transform
 
 
 def test_order_points_returns_expected_order():

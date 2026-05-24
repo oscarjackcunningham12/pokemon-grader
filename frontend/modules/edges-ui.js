@@ -1,8 +1,10 @@
 export function updateEdgesUI(data) {
-    if (!data || !data.edges) return;
+    const edges = data?.combined?.edges || data?.edges;
+    if (!edges) return;
 
-    document.getElementById("edges-score").textContent = data.edges.overall_score;
-    document.getElementById("edges-severity").textContent = summarizeSeverity(data.edges.sides);
+    document.getElementById("edges-score").textContent = edges.overall_score;
+    document.getElementById("edges-severity").textContent =
+        edges.severity || summarizeSeverity(edges.sides);
 }
 
 

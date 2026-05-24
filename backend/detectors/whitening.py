@@ -23,6 +23,7 @@ class WhiteningAnalysisResult:
     score: float
     spot_count: int
     total_spot_area: int
+    analyzed_area: int
     severity: str
     spots: List[WhiteningSpot]
     overlay_image: np.ndarray
@@ -76,6 +77,38 @@ def build_print_edge_mask(image_bgr: np.ndarray) -> np.ndarray:
     return edges
 
 
+def normalize_lighting(image_bgr: np.ndarray) -> np.ndarray:
+    """
+    Reduces broad lighting casts before thresholding tiny bright whitening marks.
+    """
+    lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+    lightness, a_channel, b_channel = cv2.split(lab)
+
+    clahe = cv2.createCLAHE(clipLimit=1.8, tileGridSize=(8, 8))
+    lightness = clahe.apply(lightness)
+
+    normalized = cv2.merge((lightness, a_channel, b_channel))
+    return cv2.cvtColor(normalized, cv2.COLOR_LAB2BGR)
+
+
+def adaptive_whitening_thresholds(
+    image_bgr: np.ndarray,
+    brightness_floor: int,
+    saturation_ceiling: int,
+) -> Tuple[int, int]:
+    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    saturation = hsv[:, :, 1]
+    value = hsv[:, :, 2]
+
+    bright_threshold = int(np.percentile(value, 88))
+    low_sat_threshold = int(np.percentile(saturation, 35))
+
+    return (
+        max(brightness_floor, min(245, bright_threshold)),
+        min(saturation_ceiling, max(28, low_sat_threshold)),
+    )
+
+
 def detect_whitening_mask(
     image_bgr: np.ndarray,
     brightness_threshold: int = 218,
@@ -84,17 +117,24 @@ def detect_whitening_mask(
     """
     Finds low-saturation bright marks, but suppresses printed design edges.
     """
-    hsv = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2HSV)
+    normalized_bgr = normalize_lighting(image_bgr)
+    adaptive_brightness, adaptive_saturation = adaptive_whitening_thresholds(
+        normalized_bgr,
+        brightness_threshold,
+        saturation_threshold,
+    )
+
+    hsv = cv2.cvtColor(normalized_bgr, cv2.COLOR_BGR2HSV)
 
     saturation = hsv[:, :, 1]
     value = hsv[:, :, 2]
 
-    bright_mask = value > brightness_threshold
-    low_sat_mask = saturation < saturation_threshold
+    bright_mask = value > adaptive_brightness
+    low_sat_mask = saturation < adaptive_saturation
 
     mask = np.logical_and(bright_mask, low_sat_mask).astype(np.uint8) * 255
 
-    print_edge_mask = build_print_edge_mask(image_bgr)
+    print_edge_mask = build_print_edge_mask(normalized_bgr)
 
     # Ignore hard printed edges/logos/text.
     mask[print_edge_mask > 0] = 0
@@ -250,6 +290,7 @@ def analyze_whitening(
         score=score,
         spot_count=len(whitening_spots),
         total_spot_area=int(total_area),
+        analyzed_area=int(total_region_area),
         severity=classify_severity(score),
         spots=whitening_spots,
         overlay_image=overlay,
@@ -261,6 +302,7 @@ def whitening_result_to_dict(result: WhiteningAnalysisResult) -> dict:
         "score": result.score,
         "spot_count": result.spot_count,
         "total_spot_area": result.total_spot_area,
+        "analyzed_area": result.analyzed_area,
         "severity": result.severity,
         "spots": [asdict(spot) for spot in result.spots],
     }

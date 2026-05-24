@@ -12,6 +12,8 @@ class CornerSpot:
     corner: str
     x: int
     y: int
+    width: int
+    height: int
     area: int
     severity: str
 
@@ -22,6 +24,7 @@ class CornerResult:
     score: float
     spot_count: int
     total_spot_area: int
+    analyzed_area: int
     severity: str
 
 
@@ -180,6 +183,8 @@ def analyze_corners(
                     corner=corner,
                     x=int(global_x),
                     y=int(global_y),
+                    width=int(w),
+                    height=int(h),
                     area=int(area),
                     severity=severity,
                 )
@@ -201,6 +206,7 @@ def analyze_corners(
             score=score,
             spot_count=len(raw_spots),
             total_spot_area=int(total_area),
+            analyzed_area=int(corner_area),
             severity=classify_severity(score),
         )
 

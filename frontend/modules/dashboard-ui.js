@@ -14,25 +14,30 @@ export function updateFinalGradeUI(data) {
 export function updateScoreCardsUI(data) {
     if (!data) return;
 
+    const summary = data.combined || data;
+    const centering = summary.centering || data.centering;
+
     // Centering
-    document.getElementById("horizontal-ratio").textContent = data.centering.horizontal_ratio;
-    document.getElementById("vertical-ratio").textContent = data.centering.vertical_ratio;
+    document.getElementById("horizontal-ratio").textContent = centering.horizontal_ratio;
+    document.getElementById("vertical-ratio").textContent = centering.vertical_ratio;
 
     // Edges
-    document.getElementById("edges-score").textContent = data.edges.overall_score;
-    document.getElementById("edges-severity").textContent = summarizeSeverity(data.edges.sides);
+    document.getElementById("edges-score").textContent = summary.edges.overall_score;
+    document.getElementById("edges-severity").textContent =
+        summary.edges.severity || summarizeSeverity(summary.edges.sides);
 
     // Corners
-    document.getElementById("corners-score").textContent = data.corners.overall_score;
-    document.getElementById("corners-severity").textContent = summarizeSeverity(data.corners.corners);
+    document.getElementById("corners-score").textContent = summary.corners.overall_score;
+    document.getElementById("corners-severity").textContent =
+        summary.corners.severity || summarizeSeverity(summary.corners.corners);
 
     // Whitening
-    document.getElementById("whitening-score").textContent = data.whitening.score;
-    document.getElementById("whitening-spots").textContent = data.whitening.spot_count;
+    document.getElementById("whitening-score").textContent = summary.whitening.score;
+    document.getElementById("whitening-spots").textContent = summary.whitening.spot_count;
 
     // Surface
-    document.getElementById("surface-score").textContent = data.surface.score;
-   document.getElementById("surface-defects").textContent = data.surface.issue_count;
+    document.getElementById("surface-score").textContent = summary.surface.score;
+    document.getElementById("surface-defects").textContent = summary.surface.issue_count;
 }
 
 

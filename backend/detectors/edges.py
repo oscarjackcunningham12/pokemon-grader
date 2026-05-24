@@ -12,6 +12,8 @@ class EdgeSpot:
     side: str
     x: int
     y: int
+    width: int
+    height: int
     area: int
     severity: str
 
@@ -22,6 +24,7 @@ class EdgeSideResult:
     score: float
     spot_count: int
     total_spot_area: int
+    analyzed_area: int
     severity: str
 
 
@@ -201,6 +204,8 @@ def analyze_edges(
                     side=side,
                     x=int(global_x),
                     y=int(global_y),
+                    width=int(w),
+                    height=int(h),
                     area=int(area),
                     severity=severity,
                 )
@@ -228,6 +233,7 @@ def analyze_edges(
             score=score,
             spot_count=len(raw_spots),
             total_spot_area=int(total_area),
+            analyzed_area=int(edge_area),
             severity=classify_severity(score),
         )
 

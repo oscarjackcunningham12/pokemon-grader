@@ -1,8 +1,10 @@
 export function updateCornersUI(data) {
-    if (!data || !data.corners) return;
+    const corners = data?.combined?.corners || data?.corners;
+    if (!corners) return;
 
-    document.getElementById("corners-score").textContent = data.corners.overall_score;
-    document.getElementById("corners-severity").textContent = summarizeSeverity(data.corners.corners);
+    document.getElementById("corners-score").textContent = corners.overall_score;
+    document.getElementById("corners-severity").textContent =
+        corners.severity || summarizeSeverity(corners.corners);
 }
 
 

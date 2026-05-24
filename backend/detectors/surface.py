@@ -23,6 +23,7 @@ class SurfaceAnalysisResult:
     score: float
     issue_count: int
     total_issue_area: int
+    analyzed_area: int
     severity: str
     spots: List[SurfaceSpot]
     overlay_image: np.ndarray
@@ -251,6 +252,7 @@ def analyze_surface(
         score=score,
         issue_count=len(spots),
         total_issue_area=int(total_area),
+        analyzed_area=int(crop_area),
         severity=classify_severity(score),
         spots=spots,
         overlay_image=overlay,
@@ -262,6 +264,7 @@ def surface_result_to_dict(result: SurfaceAnalysisResult) -> dict:
         "score": result.score,
         "issue_count": result.issue_count,
         "total_issue_area": result.total_issue_area,
+        "analyzed_area": result.analyzed_area,
         "severity": result.severity,
         "spots": [asdict(spot) for spot in result.spots],
     }
