@@ -39,7 +39,7 @@ from backend.utils.scoring import (
     finding_grade_penalty,
 )
 from backend.utils.regions import build_regions_from_centering_lines, regions_to_dict
-from utils.regions_overlay import draw_regions_overlay
+from backend.utils.regions_overlay import draw_regions_overlay
 
 
 app = Flask(__name__)
