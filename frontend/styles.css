@@ -320,6 +320,76 @@
     cursor: pointer;
   }
 
+  .identifier-upload-zone {
+    aspect-ratio: 16/9;
+    margin-bottom: 14px;
+  }
+
+  .identifier-preview {
+    min-height: 180px;
+    margin-bottom: 14px;
+  }
+
+  .identifier-preview img {
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+  }
+
+  .identifier-result {
+    display: grid;
+    grid-template-columns: 86px 1fr;
+    gap: 14px;
+    margin-top: 16px;
+    padding: 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  .identifier-result[hidden] {
+    display: none;
+  }
+
+  .identifier-card-image {
+    width: 86px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .identifier-details {
+    min-width: 0;
+  }
+
+  .identifier-name {
+    color: var(--text);
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  .identifier-meta {
+    display: grid;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .identifier-meta strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .identifier-price {
+    margin-top: 12px;
+    color: var(--accent);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 30px;
+    line-height: 1;
+    letter-spacing: 0.04em;
+  }
+
   .btn-analyze:disabled {
     cursor: not-allowed;
     opacity: 0.45;
@@ -427,4 +497,5 @@
     .score-row { grid-template-columns: 92px 1fr 42px; }
     .grade-display { align-items: flex-start; flex-direction: column; }
     .grade-number { font-size: 72px; }
+    .identifier-result { grid-template-columns: 1fr; }
   }

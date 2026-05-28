@@ -32,6 +32,7 @@ from backend.detectors.surface import (
     score_surface,
     classify_severity as classify_surface_severity,
 )
+from backend.detectors.identifier import CardIdentificationError, identify_card
 from backend.utils.image_utils import pil_to_bgr, bgr_to_rgb
 from backend.utils.scoring import (
     calculate_final_grade,
@@ -580,6 +581,39 @@ def recalculate_corrections_route():
 
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/identify", methods=["POST"])
+def identify_card_route():
+    if "image" not in request.files:
+        return jsonify({
+            "success": False,
+            "error": "No image uploaded.",
+        }), 400
+
+    try:
+        image = Image.open(request.files["image"].stream)
+        card = identify_card(image)
+
+        return jsonify({
+            "success": True,
+            "card": card,
+        })
+
+    except CardIdentificationError as exc:
+        message = str(exc)
+        status_code = 404 if message == "No matching card found" else 400
+
+        return jsonify({
+            "success": False,
+            "error": message,
+        }), status_code
+
+    except Exception as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+        }), 500
 
 
 @app.route("/api/analyze/full", methods=["POST"])

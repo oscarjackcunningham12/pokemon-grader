@@ -54,6 +54,34 @@
                 </div>
 
                 <div class="panel">
+                    <h2 class="panel-title">Card Identification</h2>
+
+                    <label class="upload-zone identifier-upload-zone" for="identifier-upload">
+                        <span class="upload-face">Identify</span>
+                        <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M12 16V4m0 0L8 8m4-4 4 4"></path>
+                            <rect x="3" y="16" width="18" height="5" rx="2"></rect>
+                        </svg>
+                        <span class="label">Choose card image</span>
+                        <input type="file" id="identifier-upload" accept="image/*">
+                    </label>
+
+                    <div class="identifier-preview image-frame">
+                        <img id="identifier-preview-image" alt="Identifier card preview">
+                    </div>
+
+                    <div id="identifier-status" class="status">
+                        Choose a card image to identify.
+                    </div>
+
+                    <button id="identify-button" class="btn-analyze" disabled>
+                        Identify Card
+                    </button>
+
+                    <div id="identifier-result" class="identifier-result" hidden></div>
+                </div>
+
+                <div class="panel">
                     <h2 class="panel-title">Estimated Final Grade</h2>
 
                     <div class="grade-display">

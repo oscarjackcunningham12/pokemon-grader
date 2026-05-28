@@ -32,6 +32,10 @@ import {
     resetCornersUI
 } from "./modules/corners-ui.js";
 
+import {
+    initIdentifierUI
+} from "./modules/identifier-ui.js";
+
 
 const frontUpload = document.getElementById("front-upload");
 const backUpload = document.getElementById("back-upload");
@@ -416,6 +420,7 @@ if (resetCorrectionsButton) {
 
 initManualCenteringCanvas();
 initUploadZones();
+initIdentifierUI({ apiBaseUrl: API_BASE_URL });
 resetAllUI();
 updateAnalyzeButtonState();
 
