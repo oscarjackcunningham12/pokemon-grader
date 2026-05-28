@@ -16,13 +16,14 @@ class CardIdentificationError(Exception):
 
 
 def identify_card(image: Image.Image) -> dict:
-    card_name = extract_card_name(image)
+    ocr_hints = extract_card_hints(image)
+    card_name = ocr_hints.get("name")
 
     if not card_name:
         raise CardIdentificationError("Could not read card name")
 
     search_results = search_tcgdex_cards(card_name)
-    match = best_card_match(card_name, search_results)
+    match = best_card_match(card_name, search_results, ocr_hints)
 
     if not match:
         raise CardIdentificationError("No matching card found")
@@ -31,24 +32,34 @@ def identify_card(image: Image.Image) -> dict:
     return card_response(card_details)
 
 
-def extract_card_name(image: Image.Image) -> str | None:
+def extract_card_hints(image: Image.Image) -> dict:
     try:
         import pytesseract
     except Exception as exc:
         raise CardIdentificationError("Could not read card name") from exc
 
-    top = crop_card_name_region(image)
-    processed = preprocess_for_ocr(top)
-
     try:
-        text = pytesseract.image_to_string(
-            processed,
+        name_text = pytesseract.image_to_string(
+            preprocess_for_ocr(crop_card_name_region(image)),
+            config="--psm 6",
+        )
+        bottom_text = pytesseract.image_to_string(
+            preprocess_for_ocr(crop_card_info_region(image)),
             config="--psm 6",
         )
     except Exception as exc:
         raise CardIdentificationError("Could not read card name") from exc
 
-    return clean_card_name(text)
+    return {
+        "name": clean_card_name(name_text),
+        "number": extract_card_number(bottom_text),
+        "is_promo": extract_promo_hint(bottom_text),
+        "bottom_text": bottom_text,
+    }
+
+
+def extract_card_name(image: Image.Image) -> str | None:
+    return extract_card_hints(image).get("name")
 
 
 def crop_card_name_region(image: Image.Image) -> Image.Image:
@@ -60,6 +71,18 @@ def crop_card_name_region(image: Image.Image) -> Image.Image:
         0,
         width,
         max(1, int(height * 0.28)),
+    ))
+
+
+def crop_card_info_region(image: Image.Image) -> Image.Image:
+    image = ImageOps.exif_transpose(image).convert("RGB")
+    width, height = image.size
+
+    return image.crop((
+        0,
+        int(height * 0.72),
+        width,
+        height,
     ))
 
 
@@ -169,21 +192,56 @@ def ssl_context():
     return ssl.create_default_context(cafile=certifi.where())
 
 
-def best_card_match(query: str, cards: list[dict]) -> dict | None:
+def extract_card_number(text: str) -> str | None:
+    normalized = text.replace("／", "/")
+
+    patterns = [
+        r"\b(SVP|SWSH|SM|XY|BW|DP)\s*-?\s*(\d{1,3})\b",
+        r"\b([A-Z]{1,4}\d{1,3})\b",
+        r"\b(\d{1,3}[a-zA-Z]?)\s*/\s*\d{1,3}\b",
+        r"\bNo\.?\s*(\d{1,3}[a-zA-Z]?)\b",
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if match:
+            return "".join(group for group in match.groups() if group).upper()
+
+    return None
+
+
+def extract_promo_hint(text: str) -> bool:
+    return bool(re.search(r"\bpromo\b|black\s+star|SVP|SWSH", text, flags=re.IGNORECASE))
+
+
+def best_card_match(query: str, cards: list[dict], hints: dict | None = None) -> dict | None:
     if not cards:
         return None
 
     normalized_query = normalize_name(query)
+    hints = hints or {}
+    hinted_number = normalize_card_number(hints.get("number"))
+    hinted_promo = bool(hints.get("is_promo"))
 
     def score(card: dict) -> float:
         name = normalize_name(card.get("name", ""))
         if not name:
             return 0
         if name == normalized_query:
-            return 1
-        if normalized_query in name or name in normalized_query:
-            return 0.92
-        return SequenceMatcher(None, normalized_query, name).ratio()
+            total = 1
+        elif normalized_query in name or name in normalized_query:
+            total = 0.92
+        else:
+            total = SequenceMatcher(None, normalized_query, name).ratio()
+
+        card_number = normalize_card_number(card.get("localId") or card.get("number"))
+        if hinted_number and card_number == hinted_number:
+            total += 0.45
+
+        if hinted_promo and card_looks_like_promo(card):
+            total += 0.25
+
+        return total
 
     best = max(cards, key=score)
 
@@ -191,6 +249,34 @@ def best_card_match(query: str, cards: list[dict]) -> dict | None:
         return None
 
     return best
+
+
+def normalize_card_number(value) -> str:
+    if value is None:
+        return ""
+
+    normalized = str(value).upper()
+    normalized = re.sub(r"[^A-Z0-9]", "", normalized)
+    return normalized
+
+
+def card_looks_like_promo(card: dict) -> bool:
+    values = [
+        card.get("id", ""),
+        card.get("localId", ""),
+        card.get("number", ""),
+        card.get("rarity", ""),
+    ]
+
+    card_set = card.get("set")
+    if isinstance(card_set, dict):
+        values.extend([
+            card_set.get("id", ""),
+            card_set.get("name", ""),
+        ])
+
+    haystack = " ".join(str(value) for value in values)
+    return bool(re.search(r"promo|black\s+star|SVP|SWSH", haystack, flags=re.IGNORECASE))
 
 
 def normalize_name(value: str) -> str:
