@@ -13,7 +13,8 @@ import {
 import {
     updateFinalGradeUI,
     updateScoreCardsUI,
-    resetDashboardUI
+    resetDashboardUI,
+    setScoreBar
 } from "./modules/dashboard-ui.js";
 
 import {
@@ -567,18 +568,38 @@ function applyCorrectedScoreCards(adjustedData) {
         summary.centering?.horizontal_ratio || "-";
     document.getElementById("vertical-ratio").textContent =
         summary.centering?.vertical_ratio || "-";
+    setScoreBar("horizontal-score-bar", getRatioScore(summary.centering?.horizontal_ratio));
+    setScoreBar("vertical-score-bar", getRatioScore(summary.centering?.vertical_ratio));
 
     document.getElementById("edges-score").textContent = summary.edges.overall_score;
     document.getElementById("edges-severity").textContent = summary.edges.severity;
+    setScoreBar("edges-score-bar", summary.edges.overall_score);
 
     document.getElementById("corners-score").textContent = summary.corners.overall_score;
     document.getElementById("corners-severity").textContent = summary.corners.severity;
+    setScoreBar("corners-score-bar", summary.corners.overall_score);
 
     document.getElementById("whitening-score").textContent = summary.whitening.score;
     document.getElementById("whitening-spots").textContent = summary.whitening.spot_count;
+    setScoreBar("whitening-score-bar", summary.whitening.score);
 
     document.getElementById("surface-score").textContent = summary.surface.score;
     document.getElementById("surface-defects").textContent = summary.surface.issue_count;
+    setScoreBar("surface-score-bar", summary.surface.score);
+}
+
+function getRatioScore(rawRatio) {
+    const ratioText = String(rawRatio || "");
+    const numbers = ratioText.match(/\d+(\.\d+)?/g)?.map(Number);
+
+    if (!numbers || numbers.length < 2) return null;
+
+    const lowerSide = Math.min(numbers[0], numbers[1]);
+    const higherSide = Math.max(numbers[0], numbers[1]);
+
+    if (!higherSide) return null;
+
+    return (lowerSide / higherSide) * 10;
 }
 
 async function recalculateCorrections() {

@@ -3,209 +3,229 @@
 <head>
     <meta charset="UTF-8">
     <title>Pokemon Card Grader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <h1>Pokemon Card Grader</h1>
-    <p class="subtitle">
-        Manual centering, front/back grading, condition scoring, and visual overlays
-    </p>
-
-    <!-- Upload -->
-    <div class="upload-section">
-        <h3>Upload Card Images</h3>
-
-        <div class="upload-grid">
-            <div class="upload-card">
-                <label for="front-upload">Front Image</label>
-                <input type="file" id="front-upload" accept="image/*">
+    <div class="shell">
+        <header>
+            <div>
+                <div class="logo">Pokemon <span>Card Grader</span></div>
+                <p class="subtitle">
+                    Manual centering, front/back grading, condition scoring, and visual overlays
+                </p>
             </div>
+            <div class="badge">Beta</div>
+        </header>
 
-            <div class="upload-card">
-                <label for="back-upload">Back Image</label>
-                <input type="file" id="back-upload" accept="image/*">
-            </div>
-        </div>
+        <main class="grid">
+            <section>
+                <!-- Upload -->
+                <div class="panel">
+                    <h2 class="panel-title">Upload Card Images</h2>
 
-        <div id="status"></div>
+                    <div class="upload-grid">
+                        <label class="upload-zone" for="front-upload">
+                            <span class="upload-face">Front</span>
+                            <span class="label">Choose front image</span>
+                            <input type="file" id="front-upload" accept="image/*">
+                        </label>
 
-        <button id="analyze-button" disabled>
-            Analyze Card
-        </button>
-    </div>
+                        <label class="upload-zone" for="back-upload">
+                            <span class="upload-face">Back</span>
+                            <span class="label">Choose back image</span>
+                            <input type="file" id="back-upload" accept="image/*">
+                        </label>
+                    </div>
 
-    <!-- Manual Centering -->
-    <div class="manual-centering-section">
-        <h3>Manual Centering Selection</h3>
+                    <div id="status" class="status"></div>
 
-        <p>
-            Adjust the guide lines for both the front and back before analyzing.
-        </p>
+                    <button id="analyze-button" class="btn-analyze" disabled>
+                        Analyze Card
+                    </button>
+                </div>
 
-        <div class="centering-canvas-grid">
+                <!-- Final Grade -->
+                <div class="panel">
+                    <h2 class="panel-title">Estimated Final Grade</h2>
 
-            <div class="centering-canvas-card">
-                <h4>Front Centering</h4>
-                <canvas id="front-centering-canvas"></canvas>
-            </div>
+                    <div class="grade-display">
+                        <div id="final-grade" class="grade-number">-</div>
+                        <div class="grade-meta">
+                            <div id="grade-label" class="grade-label">-</div>
+                            <div id="grade-summary" class="grade-desc">
+                                Upload front and back images to generate an estimate.
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="centering-canvas-card">
-                <h4>Back Centering</h4>
-                <canvas id="back-centering-canvas"></canvas>
-            </div>
+                <!-- Score Rows -->
+                <div class="panel">
+                    <h2 class="panel-title">Condition Scores</h2>
 
-        </div>
-    </div>
+                    <div class="score-list">
+                        <div class="score-row">
+                            <div class="score-name">Centering H</div>
+                            <div class="score-bar-track">
+                                <div id="horizontal-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="horizontal-ratio" class="score-val">-</div>
+                        </div>
 
-    <!-- Final Grade -->
-    <div class="final-grade-card">
-        <h2>Estimated Final Grade</h2>
+                        <div class="score-row">
+                            <div class="score-name">Centering V</div>
+                            <div class="score-bar-track">
+                                <div id="vertical-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="vertical-ratio" class="score-val">-</div>
+                        </div>
 
-        <div id="final-grade">-</div>
+                        <div class="score-row">
+                            <div class="score-name">Edges</div>
+                            <div class="score-bar-track">
+                                <div id="edges-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="edges-score" class="score-val">-</div>
+                        </div>
 
-        <p id="grade-label">-</p>
+                        <div class="score-row">
+                            <div class="score-name">Corners</div>
+                            <div class="score-bar-track">
+                                <div id="corners-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="corners-score" class="score-val">-</div>
+                        </div>
 
-        <p id="grade-summary">
-            Upload front and back images to generate an estimate.
-        </p>
-    </div>
+                        <div class="score-row">
+                            <div class="score-name">Whitening</div>
+                            <div class="score-bar-track">
+                                <div id="whitening-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="whitening-score" class="score-val">-</div>
+                        </div>
 
-    <!-- Score Cards -->
-    <div class="score-grid">
+                        <div class="score-row">
+                            <div class="score-name">Surface</div>
+                            <div class="score-bar-track">
+                                <div id="surface-score-bar" class="score-bar-fill"></div>
+                            </div>
+                            <div id="surface-score" class="score-val">-</div>
+                        </div>
+                    </div>
 
-        <div class="score-card">
-            <h3>Centering</h3>
-            <p>Combined H: <span id="horizontal-ratio">-</span></p>
-            <p>Combined V: <span id="vertical-ratio">-</span></p>
-        </div>
+                    <div class="score-meta">
+                        <span>Edges: <strong id="edges-severity">-</strong></span>
+                        <span>Corners: <strong id="corners-severity">-</strong></span>
+                        <span>Spots: <strong id="whitening-spots">-</strong></span>
+                        <span>Issues: <strong id="surface-defects">-</strong></span>
+                    </div>
+                </div>
 
-        <div class="score-card">
-            <h3>Edges</h3>
-            <p>Score: <span id="edges-score">-</span></p>
-            <p>Severity: <span id="edges-severity">-</span></p>
-        </div>
+                <!-- Centering Measurements -->
+                <div class="panel">
+                    <h2 class="panel-title">Centering Measurements</h2>
 
-        <div class="score-card">
-            <h3>Corners</h3>
-            <p>Score: <span id="corners-score">-</span></p>
-            <p>Severity: <span id="corners-severity">-</span></p>
-        </div>
+                    <div class="meas-grid">
+                        <div class="meas-cell">
+                            <div class="meas-key">Left</div>
+                            <div id="left" class="meas-val">-</div>
+                        </div>
 
-        <div class="score-card">
-            <h3>Whitening</h3>
-            <p>Score: <span id="whitening-score">-</span></p>
-            <p>Spots: <span id="whitening-spots">-</span></p>
-        </div>
+                        <div class="meas-cell">
+                            <div class="meas-key">Right</div>
+                            <div id="right" class="meas-val">-</div>
+                        </div>
 
-        <div class="score-card">
-            <h3>Surface</h3>
-            <p>Score: <span id="surface-score">-</span></p>
-            <p>Issues: <span id="surface-defects">-</span></p>
-        </div>
+                        <div class="meas-cell">
+                            <div class="meas-key">Top</div>
+                            <div id="top" class="meas-val">-</div>
+                        </div>
 
-    </div>
+                        <div class="meas-cell">
+                            <div class="meas-key">Bottom</div>
+                            <div id="bottom" class="meas-val">-</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
 
-    <!-- Centering Measurements -->
-    <div class="measurements">
-        <h3>Centering Measurements</h3>
+            <section class="right-col">
+                <!-- Manual Centering -->
+                <div class="panel">
+                    <h2 class="panel-title">Manual Centering Selection</h2>
 
-        <p>Left: <span id="left">-</span></p>
-        <p>Right: <span id="right">-</span></p>
-        <p>Top: <span id="top">-</span></p>
-        <p>Bottom: <span id="bottom">-</span></p>
-    </div>
+                    <div class="centering-panels">
+                        <div>
+                            <div class="section-label">Front Centering</div>
+                            <div class="centering-wrap">
+                                <canvas id="front-centering-canvas"></canvas>
+                            </div>
+                        </div>
 
-    <!-- Overlay Switcher -->
-    <div class="overlay-switcher">
+                        <div>
+                            <div class="section-label">Back Centering</div>
+                            <div class="centering-wrap">
+                                <canvas id="back-centering-canvas"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <h3>Overlay View</h3>
+                <!-- Overlay Switcher -->
+                <div class="panel">
+                    <h2 class="panel-title">Overlay View</h2>
 
-        <div class="overlay-buttons">
+                    <div class="overlay-pills">
+                        <button class="pill" data-overlay="centering_overlay">Front Centering</button>
+                        <button class="pill" data-overlay="regions_overlay">Front Regions</button>
+                        <button class="pill" data-overlay="edges_overlay">Front Edges</button>
+                        <button class="pill" data-overlay="corners_overlay">Front Corners</button>
+                        <button class="pill" data-overlay="whitening_overlay">Front Whitening</button>
+                        <button class="pill" data-overlay="surface_overlay">Front Surface</button>
+                        <button class="pill" data-overlay="back_card">Back Card</button>
+                        <button class="pill" data-overlay="back_centering_overlay">Back Centering</button>
+                        <button class="pill" data-overlay="back_regions_overlay">Back Regions</button>
+                        <button class="pill" data-overlay="back_edges_overlay">Back Edges</button>
+                        <button class="pill" data-overlay="back_corners_overlay">Back Corners</button>
+                        <button class="pill" data-overlay="back_whitening_overlay">Back Whitening</button>
+                        <button class="pill" data-overlay="back_surface_overlay">Back Surface</button>
+                    </div>
+                </div>
 
-            <button data-overlay="centering_overlay">
-                Front Centering
-            </button>
+                <!-- Images -->
+                <div class="panel">
+                    <div class="image-grid">
+                        <div>
+                            <h2 class="panel-title">Processed Card</h2>
+                            <div class="image-frame">
+                                <img id="preview-image" alt="Processed card preview">
+                            </div>
+                        </div>
 
-            <button data-overlay="regions_overlay">
-                Front Regions
-            </button>
+                        <div>
+                            <h2 id="overlay-title" class="panel-title">
+                                Centering Overlay
+                            </h2>
 
-            <button data-overlay="edges_overlay">
-                Front Edges
-            </button>
+                            <div class="overlay-frame">
+                                <img id="overlay-image" alt="Selected grading overlay">
+                                <canvas id="correction-canvas"></canvas>
+                            </div>
 
-            <button data-overlay="corners_overlay">
-                Front Corners
-            </button>
-
-            <button data-overlay="whitening_overlay">
-                Front Whitening
-            </button>
-
-            <button data-overlay="surface_overlay">
-                Front Surface
-            </button>
-
-            <button data-overlay="back_card">
-                Back Card
-            </button>
-
-            <button data-overlay="back_centering_overlay">
-                Back Centering
-            </button>
-
-            <button data-overlay="back_regions_overlay">
-                Back Regions
-            </button>
-
-            <button data-overlay="back_edges_overlay">
-                Back Edges
-            </button>
-
-            <button data-overlay="back_corners_overlay">
-                Back Corners
-            </button>
-
-            <button data-overlay="back_whitening_overlay">
-                Back Whitening
-            </button>
-
-            <button data-overlay="back_surface_overlay">
-                Back Surface
-            </button>
-
-        </div>
-    </div>
-
-    <!-- Images -->
-    <div class="images">
-
-        <div>
-            <h3>Processed Card</h3>
-            <img id="preview-image" />
-        </div>
-
-        <div>
-
-            <h3 id="overlay-title">
-                Centering Overlay
-            </h3>
-
-            <div class="overlay-frame">
-                <img id="overlay-image" />
-                <canvas id="correction-canvas"></canvas>
-            </div>
-
-            <div id="finding-details" class="finding-details">
-    <h4>Finding Details</h4>
-    <p>Click a detected box to inspect it.</p>
-    <button id="reset-corrections-button" class="secondary-button">
-        Reset Corrections
-    </button>
-</div>
-        </div>
-
+                            <div id="finding-details" class="finding-details">
+                                <h4>Finding Details</h4>
+                                <p>Click a detected box to inspect it.</p>
+                                <button id="reset-corrections-button" class="secondary-button">
+                                    Reset Corrections
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
     </div>
 
     <script type="module" src="app.js"></script>
