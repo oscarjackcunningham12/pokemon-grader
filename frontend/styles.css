@@ -107,14 +107,25 @@
     border-color: var(--accent);
     background: var(--accent-dim);
   }
+  .upload-zone.loaded {
+    border-style: solid;
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
   .upload-zone svg { opacity: 0.4; }
   .upload-zone:hover svg { opacity: 0.7; }
+  .upload-zone.loaded svg { opacity: 0.85; }
   .upload-zone .label {
     font-size: 12px;
     color: var(--muted);
     text-align: center;
+    max-width: calc(100% - 24px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .upload-zone:hover .label { color: var(--accent); }
+  .upload-zone.loaded .label { color: var(--accent); }
   .upload-face {
     font-size: 10px;
     letter-spacing: 0.06em;
@@ -151,7 +162,6 @@
     padding: 24px;
     background: var(--surface2);
     border-radius: var(--radius);
-    margin-bottom: 20px;
     border: 1px solid var(--border);
   }
   .grade-number {
@@ -220,36 +230,6 @@
     position: relative;
     border: 1px solid var(--border);
   }
-  .centering-card-img {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #1a1a2e 0%, #2d2d4e 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(255,255,255,0.08);
-    font-size: 48px;
-  }
-  .crosshair-h, .crosshair-v {
-    position: absolute;
-    background: rgba(232,200,71,0.6);
-    pointer-events: none;
-  }
-  .crosshair-h { height: 1px; width: 100%; top: 50%; left: 0; }
-  .crosshair-v { width: 1px; height: 100%; left: 50%; top: 0; }
-  .centering-label {
-    position: absolute;
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--accent);
-    background: rgba(14,14,18,0.85);
-    padding: 3px 8px;
-    border-radius: 4px;
-    letter-spacing: 0.04em;
-  }
-  .centering-label.tl { top: 10px; left: 10px; }
-  .centering-label.br { bottom: 10px; right: 10px; }
-
   /* ── OVERLAY TOGGLE PILLS ── */
   .overlay-pills {
     display: flex;
@@ -300,8 +280,6 @@
     font-weight: 300;
     font-family: 'DM Sans', monospace;
   }
-  .meas-val .unit { font-size: 12px; color: var(--muted); margin-left: 3px; }
-
   /* ── SECTION LABELS ── */
   .section-label {
     font-size: 11px;
@@ -309,7 +287,7 @@
     letter-spacing: 0.1em;
     color: var(--muted);
     font-weight: 500;
-    margin: 28px 0 14px;
+    margin: 0 0 14px;
     display: flex;
     align-items: center;
     gap: 10px;

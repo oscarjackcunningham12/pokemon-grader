@@ -112,6 +112,27 @@ function updateAnalyzeButtonState() {
 }
 
 
+function updateUploadZone(input, file) {
+    const zone = input?.closest(".upload-zone");
+    const label = zone?.querySelector(".label");
+
+    if (!zone || !label) return;
+
+    zone.classList.toggle("loaded", Boolean(file));
+    label.textContent = file ? file.name : label.dataset.defaultText || label.textContent;
+}
+
+
+function initUploadZones() {
+    [frontUpload, backUpload].forEach(input => {
+        const label = input?.closest(".upload-zone")?.querySelector(".label");
+        if (label && !label.dataset.defaultText) {
+            label.dataset.defaultText = label.textContent;
+        }
+    });
+}
+
+
 function setOverlay(overlayKey) {
     if (!latestImages) return;
 
@@ -391,6 +412,7 @@ if (resetCorrectionsButton) {
 
 
 initManualCenteringCanvas();
+initUploadZones();
 resetAllUI();
 updateAnalyzeButtonState();
 
@@ -405,6 +427,7 @@ frontUpload.addEventListener("change", (event) => {
     resetAllUI();
     ignoredHistory = [];
     loadManualCenteringImage(file, "front");
+    updateUploadZone(frontUpload, frontFile);
 
     setStatus("Front image loaded. Adjust the front guide lines, then upload the back image.");
     updateAnalyzeButtonState();
@@ -419,6 +442,7 @@ backUpload.addEventListener("change", (event) => {
     backFile = file;
 
     loadManualCenteringImage(file, "back");
+    updateUploadZone(backUpload, backFile);
 
     setStatus("Back image loaded. Adjust the back guide lines, then click Analyze Card.");
     updateAnalyzeButtonState();
