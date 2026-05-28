@@ -8,6 +8,7 @@ def build_report_summary(full_result: dict) -> dict:
     """
 
     final_grade = full_result.get("final_grade", {})
+    subgrades = final_grade.get("subgrades") or full_result.get("combined", {})
     centering = full_result.get("centering", {})
     edges = full_result.get("edges", {})
     corners = full_result.get("corners", {})
@@ -22,7 +23,7 @@ def build_report_summary(full_result: dict) -> dict:
             "bucket": final_grade.get("grade_bucket"),
             "summary": final_grade.get("summary"),
         },
-        "subgrades": final_grade.get("subgrades", {}),
+        "subgrades": subgrades,
         "centering": {
             "horizontal_ratio": centering.get("horizontal_ratio"),
             "vertical_ratio": centering.get("vertical_ratio"),
