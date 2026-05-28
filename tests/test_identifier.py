@@ -4,6 +4,7 @@ from backend.detectors.identifier import (
     clean_card_name,
     select_market_price,
 )
+from backend.app import identify_card_safely
 
 
 def test_clean_card_name_removes_hp_text():
@@ -58,3 +59,17 @@ def test_card_response_marks_missing_price_unavailable():
     assert response["price"] == "Pricing unavailable"
     assert response["currency"] == ""
     assert response["image"].endswith("/high.webp")
+
+
+def test_identify_card_safely_returns_graceful_failure(monkeypatch):
+    def fail_identification(_image):
+        raise RuntimeError("OCR unavailable")
+
+    monkeypatch.setattr("backend.app.identify_card", fail_identification)
+
+    result = identify_card_safely(object())
+
+    assert result == {
+        "success": False,
+        "error": "OCR unavailable",
+    }

@@ -33,7 +33,9 @@ import {
 } from "./modules/corners-ui.js";
 
 import {
-    initIdentifierUI
+    initIdentifierUI,
+    setIdentifierPreviewFromFile,
+    showIdentificationResult
 } from "./modules/identifier-ui.js";
 
 
@@ -436,6 +438,7 @@ frontUpload.addEventListener("change", (event) => {
     ignoredHistory = [];
     loadManualCenteringImage(file, "front");
     updateUploadZone(frontUpload, frontFile);
+    setIdentifierPreviewFromFile(frontFile);
 
     setStatus("Front image loaded. Adjust the front guide lines, then upload the back image.");
     updateAnalyzeButtonState();
@@ -507,6 +510,7 @@ analyzeButton.addEventListener("click", async () => {
         updateCenteringUI(data);
         updateEdgesUI(data);
         updateCornersUI(data);
+        showIdentificationResult(data.identification);
 
         console.log("Full grading result:", data);
 

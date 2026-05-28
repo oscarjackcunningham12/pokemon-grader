@@ -1,3 +1,6 @@
+const elements = {};
+
+
 export function initIdentifierUI({ apiBaseUrl }) {
     const uploadInput = document.getElementById("identifier-upload");
     const identifyButton = document.getElementById("identify-button");
@@ -10,6 +13,12 @@ export function initIdentifierUI({ apiBaseUrl }) {
     if (!uploadInput || !identifyButton || !previewImage || !status || !resultPanel) {
         return;
     }
+
+    elements.uploadInput = uploadInput;
+    elements.identifyButton = identifyButton;
+    elements.previewImage = previewImage;
+    elements.status = status;
+    elements.resultPanel = resultPanel;
 
     uploadInput.addEventListener("change", () => {
         selectedFile = uploadInput.files[0] || null;
@@ -64,6 +73,40 @@ export function initIdentifierUI({ apiBaseUrl }) {
             identifyButton.textContent = "Identify Card";
         }
     });
+}
+
+
+export function showIdentificationResult(identification) {
+    if (!elements.status || !elements.resultPanel) return;
+
+    resetResult(elements.resultPanel);
+
+    if (!identification) {
+        setIdentifierStatus(elements.status, "Identification was not returned with this grade.");
+        return;
+    }
+
+    if (!identification.success) {
+        setIdentifierStatus(elements.status, identification.error || "Could not identify card.");
+        return;
+    }
+
+    renderCardResult(elements.resultPanel, identification.card);
+    setIdentifierStatus(elements.status, "Card identified from grading upload.");
+}
+
+
+export function setIdentifierPreviewFromFile(file) {
+    if (!elements.previewImage || !elements.uploadInput) return;
+
+    updateUploadZone(elements.uploadInput, file);
+
+    if (!file) {
+        elements.previewImage.removeAttribute("src");
+        return;
+    }
+
+    elements.previewImage.src = URL.createObjectURL(file);
 }
 
 

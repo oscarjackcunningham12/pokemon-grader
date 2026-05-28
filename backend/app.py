@@ -76,6 +76,32 @@ def load_image_from_request(file_key: str) -> np.ndarray:
     return pil_to_bgr(pil_image)
 
 
+def load_pil_image_from_request(file_key: str) -> Image.Image:
+    if file_key not in request.files:
+        raise ValueError(f"Missing required image: {file_key}")
+
+    image = Image.open(request.files[file_key].stream)
+    return image.copy()
+
+
+def identify_card_safely(image: Image.Image) -> dict:
+    try:
+        return {
+            "success": True,
+            "card": identify_card(image),
+        }
+    except CardIdentificationError as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": str(exc),
+        }
+
+
 def ratio_off_center_amount(ratio: str) -> int:
     try:
         a, b = ratio.split("/")
@@ -627,8 +653,11 @@ def analyze_full_route():
             front_manual_lines = old_manual_lines
 
         if "front_image" in request.files and "back_image" in request.files:
-            front_bgr = load_image_from_request("front_image")
-            back_bgr = load_image_from_request("back_image")
+            front_image = load_pil_image_from_request("front_image")
+            back_image = load_pil_image_from_request("back_image")
+            identification = identify_card_safely(front_image)
+            front_bgr = pil_to_bgr(front_image)
+            back_bgr = pil_to_bgr(back_image)
 
             front = analyze_one_side(front_bgr, manual_lines=front_manual_lines)
             back = analyze_one_side(back_bgr, manual_lines=back_manual_lines)
@@ -669,6 +698,7 @@ def analyze_full_route():
             response = {
                 "mode": "front_back",
                 "final_grade": final_grade_to_dict(final_grade),
+                "identification": identification,
                 "combined": combined,
                 "centering": front_centering_dict,
                 "back_centering": back_centering_dict,
@@ -708,7 +738,9 @@ def analyze_full_route():
             return jsonify(response)
 
         if "image" in request.files:
-            image_bgr = load_image_from_request("image")
+            image = load_pil_image_from_request("image")
+            identification = identify_card_safely(image)
+            image_bgr = pil_to_bgr(image)
             result = analyze_one_side(image_bgr, manual_lines=front_manual_lines)
             result_dicts = detector_to_dicts(result)
 
@@ -735,6 +767,7 @@ def analyze_full_route():
             response = {
                 "mode": "single",
                 "final_grade": final_grade_to_dict(final_grade),
+                "identification": identification,
                 "combined": combined_subgrades_for_single(result_dicts, centering_dict),
                 "centering": centering_dict,
                 "regions": regions_to_dict(result["regions"]) if result["regions"] else None,
