@@ -102,6 +102,9 @@ function resetAllUI() {
             button.dataset.overlay === "centering_overlay"
         );
     });
+
+    updateUploadZone(frontUpload, frontFile);
+    updateUploadZone(backUpload, backFile);
 }
 
 
