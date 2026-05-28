@@ -1,4 +1,7 @@
 const elements = {};
+let selectedFile = null;
+let previewObjectUrl = null;
+let identifyRequestId = 0;
 
 
 export function initIdentifierUI({ apiBaseUrl }) {
@@ -7,8 +10,6 @@ export function initIdentifierUI({ apiBaseUrl }) {
     const previewImage = document.getElementById("identifier-preview-image");
     const status = document.getElementById("identifier-status");
     const resultPanel = document.getElementById("identifier-result");
-
-    let selectedFile = null;
 
     if (!uploadInput || !identifyButton || !previewImage || !status || !resultPanel) {
         return;
@@ -22,17 +23,19 @@ export function initIdentifierUI({ apiBaseUrl }) {
 
     uploadInput.addEventListener("change", () => {
         selectedFile = uploadInput.files[0] || null;
+        identifyRequestId += 1;
         updateUploadZone(uploadInput, selectedFile);
         identifyButton.disabled = !selectedFile;
+        identifyButton.textContent = "Identify Card";
         resetResult(resultPanel);
 
         if (!selectedFile) {
-            previewImage.removeAttribute("src");
+            setPreviewImage(previewImage, null);
             setIdentifierStatus(status, "Choose a card image to identify.");
             return;
         }
 
-        previewImage.src = URL.createObjectURL(selectedFile);
+        setPreviewImage(previewImage, selectedFile);
         setIdentifierStatus(status, "Card image loaded. Ready to identify.");
     });
 
@@ -42,8 +45,12 @@ export function initIdentifierUI({ apiBaseUrl }) {
             return;
         }
 
+        const requestId = identifyRequestId + 1;
+        const fileToIdentify = selectedFile;
+        identifyRequestId = requestId;
+
         const formData = new FormData();
-        formData.append("image", selectedFile);
+        formData.append("image", fileToIdentify);
 
         identifyButton.disabled = true;
         identifyButton.textContent = "Identifying...";
@@ -55,7 +62,11 @@ export function initIdentifierUI({ apiBaseUrl }) {
                 method: "POST",
                 body: formData
             });
-            const data = await response.json();
+            const data = await parseJsonResponse(response);
+
+            if (isStaleIdentifyResponse(requestId, fileToIdentify)) {
+                return;
+            }
 
             if (!response.ok || !data.success) {
                 setIdentifierStatus(status, data.error || "Could not identify card.");
@@ -67,10 +78,14 @@ export function initIdentifierUI({ apiBaseUrl }) {
 
         } catch (error) {
             console.error(error);
-            setIdentifierStatus(status, "Could not connect to backend. Make sure Flask is running.");
+            if (!isStaleIdentifyResponse(requestId, fileToIdentify)) {
+                setIdentifierStatus(status, "Could not identify card. Check the backend response.");
+            }
         } finally {
-            identifyButton.disabled = !selectedFile;
-            identifyButton.textContent = "Identify Card";
+            if (!isStaleIdentifyResponse(requestId, fileToIdentify)) {
+                identifyButton.disabled = !selectedFile;
+                identifyButton.textContent = "Identify Card";
+            }
         }
     });
 }
@@ -91,6 +106,11 @@ export function showIdentificationResult(identification) {
         return;
     }
 
+    if (!identification.card) {
+        setIdentifierStatus(elements.status, "Identification did not include card details.");
+        return;
+    }
+
     renderCardResult(elements.resultPanel, identification.card);
     setIdentifierStatus(elements.status, "Card identified from grading upload.");
 }
@@ -99,14 +119,36 @@ export function showIdentificationResult(identification) {
 export function setIdentifierPreviewFromFile(file) {
     if (!elements.previewImage || !elements.uploadInput) return;
 
-    updateUploadZone(elements.uploadInput, file);
+    selectedFile = file || null;
+    identifyRequestId += 1;
+    updateUploadZone(elements.uploadInput, selectedFile);
+    resetResult(elements.resultPanel);
 
-    if (!file) {
-        elements.previewImage.removeAttribute("src");
+    if (!selectedFile) {
+        setPreviewImage(elements.previewImage, null);
+
+        if (elements.identifyButton) {
+            elements.identifyButton.disabled = true;
+            elements.identifyButton.textContent = "Identify Card";
+        }
+
+        if (elements.status) {
+            setIdentifierStatus(elements.status, "Choose a card image to identify.");
+        }
+
         return;
     }
 
-    elements.previewImage.src = URL.createObjectURL(file);
+    setPreviewImage(elements.previewImage, selectedFile);
+
+    if (elements.identifyButton) {
+        elements.identifyButton.disabled = false;
+        elements.identifyButton.textContent = "Identify Card";
+    }
+
+    if (elements.status) {
+        setIdentifierStatus(elements.status, "Card image loaded. Ready to identify.");
+    }
 }
 
 
@@ -131,12 +173,19 @@ function setIdentifierStatus(status, message) {
 
 
 function resetResult(resultPanel) {
+    if (!resultPanel) return;
+
     resultPanel.hidden = true;
     resultPanel.innerHTML = "";
 }
 
 
 function renderCardResult(resultPanel, card) {
+    if (!card) {
+        resetResult(resultPanel);
+        return;
+    }
+
     resultPanel.hidden = false;
     resultPanel.innerHTML = `
         ${card.image ? `<img class="identifier-card-image" src="${escapeAttribute(card.image)}" alt="${escapeAttribute(card.name)}">` : ""}
@@ -190,4 +239,41 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) {
     return escapeHtml(value);
+}
+
+
+function setPreviewImage(previewImage, file) {
+    if (previewObjectUrl) {
+        URL.revokeObjectURL(previewObjectUrl);
+        previewObjectUrl = null;
+    }
+
+    if (!file) {
+        previewImage.removeAttribute("src");
+        return;
+    }
+
+    previewObjectUrl = URL.createObjectURL(file);
+    previewImage.src = previewObjectUrl;
+}
+
+
+async function parseJsonResponse(response) {
+    const contentType = response.headers.get("content-type") || "";
+
+    if (!contentType.includes("application/json")) {
+        return {
+            success: false,
+            error: response.ok
+                ? "Backend returned an unexpected response."
+                : `Backend returned ${response.status} ${response.statusText || "error"}.`
+        };
+    }
+
+    return response.json();
+}
+
+
+function isStaleIdentifyResponse(requestId, file) {
+    return requestId !== identifyRequestId || file !== selectedFile;
 }
