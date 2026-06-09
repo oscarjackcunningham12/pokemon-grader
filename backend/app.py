@@ -32,7 +32,7 @@ from backend.detectors.surface import (
     score_surface,
     classify_severity as classify_surface_severity,
 )
-from backend.detectors.identifier import CardIdentificationError, identify_card
+from backend.detectors.identifier import CardIdentificationDebugError, CardIdentificationError, identify_card
 from backend.utils.image_utils import pil_to_bgr, bgr_to_rgb
 from backend.utils.scoring import (
     calculate_final_grade,
@@ -67,6 +67,10 @@ def get_json_field(field_name: str):
         return None
 
 
+def get_json_form_field(field_name: str):
+    return get_json_field(field_name)
+
+
 def load_image_from_request(file_key: str) -> np.ndarray:
     if file_key not in request.files:
         raise ValueError(f"Missing required image: {file_key}")
@@ -84,11 +88,18 @@ def load_pil_image_from_request(file_key: str) -> Image.Image:
     return image.copy()
 
 
-def identify_card_safely(image: Image.Image) -> dict:
+def identify_card_safely(image: Image.Image, ocr_regions: dict | None = None) -> dict:
     try:
         return {
             "success": True,
-            "card": identify_card(image),
+            "card": identify_card(image, ocr_regions=ocr_regions),
+        }
+    except CardIdentificationDebugError as exc:
+        app.logger.info("Card identification debug: %s", exc.debug)
+        return {
+            "success": False,
+            "error": str(exc),
+            "debug": exc.debug,
         }
     except CardIdentificationError as exc:
         return {
@@ -594,6 +605,7 @@ def health():
 
 
 @app.route("/corrections/recalculate", methods=["POST"])
+@app.route("/api/corrections/recalculate", methods=["POST"])
 def recalculate_corrections_route():
     try:
         data = request.get_json(silent=True) or {}
@@ -619,12 +631,24 @@ def identify_card_route():
 
     try:
         image = Image.open(request.files["image"].stream)
-        card = identify_card(image)
+        ocr_regions = get_json_form_field("ocr_regions")
+        card = identify_card(image, ocr_regions=ocr_regions)
 
         return jsonify({
             "success": True,
             "card": card,
         })
+
+    except CardIdentificationDebugError as exc:
+        message = str(exc)
+        status_code = 404 if message == "No matching card found" else 400
+        app.logger.info("Card identification debug: %s", exc.debug)
+
+        return jsonify({
+            "success": False,
+            "error": message,
+            "debug": exc.debug,
+        }), status_code
 
     except CardIdentificationError as exc:
         message = str(exc)
@@ -647,6 +671,7 @@ def analyze_full_route():
     try:
         front_manual_lines = get_json_field("front_manual_lines")
         back_manual_lines = get_json_field("back_manual_lines")
+        ocr_regions = get_json_field("ocr_regions")
 
         old_manual_lines = get_json_field("manual_lines")
         if old_manual_lines and not front_manual_lines:
@@ -655,7 +680,7 @@ def analyze_full_route():
         if "front_image" in request.files and "back_image" in request.files:
             front_image = load_pil_image_from_request("front_image")
             back_image = load_pil_image_from_request("back_image")
-            identification = identify_card_safely(front_image)
+            identification = identify_card_safely(front_image, ocr_regions=ocr_regions)
             front_bgr = pil_to_bgr(front_image)
             back_bgr = pil_to_bgr(back_image)
 
@@ -739,7 +764,7 @@ def analyze_full_route():
 
         if "image" in request.files:
             image = load_pil_image_from_request("image")
-            identification = identify_card_safely(image)
+            identification = identify_card_safely(image, ocr_regions=ocr_regions)
             image_bgr = pil_to_bgr(image)
             result = analyze_one_side(image_bgr, manual_lines=front_manual_lines)
             result_dicts = detector_to_dicts(result)

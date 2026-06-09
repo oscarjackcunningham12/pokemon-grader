@@ -34,6 +34,7 @@ import {
 
 import {
     initIdentifierUI,
+    getIdentifierOcrRegions,
     setIdentifierPreviewFromFile,
     showIdentificationResult
 } from "./modules/identifier-ui.js";
@@ -482,6 +483,10 @@ analyzeButton.addEventListener("click", async () => {
     formData.append(
         "back_manual_lines",
         JSON.stringify(getManualCenteringLines("back"))
+    );
+    formData.append(
+        "ocr_regions",
+        JSON.stringify(getIdentifierOcrRegions())
     );
 
     try {

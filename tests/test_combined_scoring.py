@@ -166,7 +166,7 @@ def test_recalculate_endpoint_returns_combined_subgrades_after_ignored_spots():
 
     client = app.test_client()
     response = client.post(
-        "/corrections/recalculate",
+        "/api/corrections/recalculate",
         json={
             "analysis": analysis,
             "ignored_spot_ids": ["front:edges:0:1:2"],
